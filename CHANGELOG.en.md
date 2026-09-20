@@ -11,11 +11,25 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.3` | 2026-09-21 | **published** | README rewrite; the capabilities are the same as `0.1.2`. |
 | `0.1.2` | 2026-09-21 | **published** | Source installs work; the capabilities are the same as `0.1.1`. |
 | `0.1.1` | 2026-09-21 | **published** | Documentation corrections; the capabilities are the same as `0.1.0`. |
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.3] — 2026-09-21
+
+### Changed
+
+- Rewrote the README into a shorter structure: capabilities, install, configuration, data boundary,
+  settings, troubleshooting, known limitations, ledger, development. The long tutorial-style
+  introduction to Jev and the roadmap section are gone; no key fact was dropped.
+
+### Fixed
+
+- The header comment in `cordis.patch.yml` listed only some of the capabilities; it now lists all
+  of them.
 
 ## [0.1.2] — 2026-09-21
 
