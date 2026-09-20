@@ -11,9 +11,19 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
-| `0.1.0` | 2026-09-20 | **not published** | Everything described below. The package has never been on npm, so this is still the first release rather than a revision of one — there is no earlier version to be compatible with. |
+| `0.1.1` | 2026-09-21 | **published** | Documentation corrections; the capabilities are the same as `0.1.0`. |
+| `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
-**Not yet published to npm** — install it from the repository checkout.
+Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.1] — 2026-09-21
+
+### Fixed
+
+- The README and CHANGELOG statements about release status now match reality (they previously
+  said "not published"), and the README gained npm-version and license badges.
+- The stale "only two capabilities" wording in the README now states the capabilities that
+  actually ship.
 
 ## [0.1.0] — 2026-09-20
 

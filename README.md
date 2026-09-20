@@ -6,13 +6,18 @@
   <img src="docs/banner.png" width="100%" alt="dsh-jev-tools —— 把 Jev 判定模型接进 DeepSeek Harness：精简工具输出、筛查注入指令、推荐技能，外加 jev_ask 与 jev_gate 两个工具" />
 </p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-jev-tools"><img src="https://img.shields.io/npm/v/dsh-jev-tools?style=flat-square&label=npm&color=cb3837" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="license: MIT" /></a>
+</p>
+
 一个 [DeepSeek Harness](https://github.com/deepseek-ai) 插件，把 **[Jev](https://typesafe.ai)** 接进长会话：三件自动完成的事——**精简超长的工具输出**、**筛查抓取到的外部内容里有没有注入指令**、**推荐该用哪个 skill**——外加两个模型可主动调用的工具：**`jev_ask`**（任意带类型的问题）与 **`jev_gate`**（在宣布做完之前核对交付）。
 
 底层是 [Jev](https://typesafe.ai)——TypeSafe 的 System One 判定模型。它**不生成任何文本**，只返回**选择、Yes/No 和概率**。这类判定又便宜又稳定，但它**不是**通用大模型的替代品。边界见 [v0.1 的边界](#v01-的边界)。
 
 > ### 🚧 v0.1 —— 一次早期尝试
 >
-> **请把它当作一个起点，而不是一个成品。** 当前只有两项能力，且都做过实测。它们的存在主要是为了验证一个假设：*把判定模型接进 DSH 的结构化钩子，这件事本身值不值得做。*
+> **请把它当作一个起点，而不是一个成品。** 已发布的能力都经过实测。它们的存在主要是为了验证一个假设：*把判定模型接进 DSH 的结构化钩子，这件事本身值不值得做。*
 >
 > Jev 是一个年轻且演进很快的模型。我们认为，从一个 harness 出发能够到的能力，远比今天这里呈现的多。见[下一步往哪走](#下一步往哪走)。
 
@@ -192,7 +197,7 @@ dsh plugin --profile web add dsh-jev-tools
 
 ## 配置 API key
 
-**没配 key 时插件完全惰性**：正常挂载，两项能力都不生效，**不发任何网络请求**。
+**没配 key 时插件完全惰性**：正常挂载，所有能力都不生效，**不发任何网络请求**。
 
 三种方式任选一种，**都不用重启**：
 

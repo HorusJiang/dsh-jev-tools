@@ -6,13 +6,18 @@
   <img src="docs/banner.png" width="100%" alt="dsh-jev-tools — Jev judgments inside DeepSeek Harness: prune oversized tool output, screen fetched pages for injected instructions, suggest a skill, plus the jev_ask and jev_gate tools" />
 </p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-jev-tools"><img src="https://img.shields.io/npm/v/dsh-jev-tools?style=flat-square&label=npm&color=cb3837" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="license: MIT" /></a>
+</p>
+
 A [DeepSeek Harness](https://github.com/deepseek-ai) plugin that gives **[Jev](https://typesafe.ai)** three automatic jobs inside a long session — **prune oversized tool output**, **screen fetched pages for injected instructions**, **suggest which skill to use** — plus two tools the model can call when it wants a judgment: **`jev_ask`** for any typed question, and **`jev_gate`** to check a delivery before calling it done.
 
 It runs on [Jev](https://typesafe.ai), TypeSafe's System One judgment model — a model that generates no text and returns only **choices, yes/no, and probabilities**. Those judgments are cheap and remarkably stable, but they are **not** a substitute for a general model. See [v0.1 boundaries](#v01-boundaries).
 
 > ### 🚧 v0.1 — an early attempt
 >
-> **Treat this as a starting point, not a finished product.** Two capabilities are shipped and measured. They exist mainly to prove one hypothesis: *that a judgment model wired into DSH's structured hooks is worth having at all.*
+> **Treat this as a starting point, not a finished product.** Every shipped capability has been measured. They exist mainly to prove one hypothesis: *that a judgment model wired into DSH's structured hooks is worth having at all.*
 >
 > Jev is a young and fast-moving model, and we think far more of its surface is reachable from a harness than what is here today. See [Where this is going](#where-this-is-going).
 
@@ -209,7 +214,7 @@ dsh plugin --profile web add dsh-jev-tools
 
 ## Configure the API key
 
-**With no key the plugin is completely inert**: it mounts normally, both capabilities do nothing, and it makes **no network request at all**.
+**With no key the plugin is completely inert**: it mounts normally, none of its capabilities do anything, and it makes **no network request at all**.
 
 Three ways to configure it; any one works, and **none of them needs a restart**:
 
