@@ -11,10 +11,19 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.2` | 2026-09-21 | **published** | Source installs work; the capabilities are the same as `0.1.1`. |
 | `0.1.1` | 2026-09-21 | **published** | Documentation corrections; the capabilities are the same as `0.1.0`. |
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.2] — 2026-09-21
+
+### Fixed
+
+- Installing from the GitHub source now builds automatically: `package.json` gained a `prepare`
+  script. Before this a source install succeeded, but `lib/` is a build output and is not in the
+  repository, so there was no entry file to load. Installing from npm is unaffected.
 
 ## [0.1.1] — 2026-09-21
 
