@@ -1,0 +1,12 @@
+# Keep every checkout byte-identical across platforms.
+#
+# This matters more here than in most repositories: `README.i18n.yaml` and
+# `CHANGELOG.i18n.yaml` record the git blob hash of each language side, and that
+# hash is computed from the file's exact bytes. With `core.autocrlf=true` a
+# Windows checkout would rewrite the line endings, every recorded hash would stop
+# matching, and `npm test` would report the documentation as edited when nobody
+# touched it. Forcing LF makes the check platform-independent.
+* text=auto eol=lf
+
+# The banner is an image. Never touch its bytes.
+docs/banner.png binary

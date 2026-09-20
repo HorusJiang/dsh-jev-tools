@@ -1,0 +1,16 @@
+# dsh-jev-tools bundle layer: the Jev judgment primitive for DeepSeek Harness.
+#
+# Adds two capabilities that work without changing how you use the harness:
+#   1. semantic pruning of oversized tool results (tools/post-execute)
+#   2. skill suggestion when the catalog is large (agent/pre-step, advisory only)
+#
+# Requires TYPESAFE_API_KEY (environment variable or the settings card).
+# With no key configured the plugin still mounts, both capabilities stay
+# completely inert, and no network request is made.
+#
+# Privacy: once a key is configured, tool-result content is sent to
+# api.typesafe.ai for judging. Every capability can be turned off separately
+# in Settings -> Jev, and disabling takes effect immediately.
+- insert:
+    - id: jev-tools
+      name: dsh-jev-tools

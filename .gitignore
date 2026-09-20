@@ -1,0 +1,15 @@
+node_modules/
+lib/
+*.tsbuildinfo
+.npm-cache/
+
+# Local-only working documents.
+#
+# `notes/` holds the author's own material — project plans, drafts, research,
+# session notes. It is deliberately not part of the project: not published, not
+# referenced from any tracked document, and not uploaded. Anything that belongs
+# in the repository goes in `docs/` instead, which is tracked and published.
+#
+# `test/docs.test.ts` fails if a tracked document links into here, because such
+# a link would be dead for everyone who clones the repository.
+notes/

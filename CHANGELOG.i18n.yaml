@@ -1,0 +1,13 @@
+# Consistency record for a pair of documents. Both files listed below must say the
+# same thing; these are the git blob hashes of each side at the last confirmed-
+# consistent state, so editing one side without re-recording goes red in
+# `test/docs.test.ts`.
+#
+# After editing either side, bring the other along and re-record the pair:
+#
+#   git hash-object CHANGELOG.md CHANGELOG.en.md
+#
+# That test recomputes these hashes with `node:crypto` and also checks that the two
+# sides keep the same structure.
+CHANGELOG.md: 7c646c73ab37fc00fca4eca2f13327f529df2106
+CHANGELOG.en.md: ed18a897a0d7af224d0dec86b7e24a8787a7f49f

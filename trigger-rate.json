@@ -1,0 +1,142 @@
+{
+  "sizeDistribution": {
+    "count": 4655,
+    "mean": 732.4783566058002,
+    "p50": 125,
+    "p90": 1609.5,
+    "p99": 12499.75,
+    "overShare": {
+      "1000": 0.160687432867884,
+      "1500": 0.10934479054779807,
+      "2000": 0.08098818474758325,
+      "3000": 0.05392051557465091,
+      "6000": 0.027712137486573578
+    }
+  },
+  "byTool": {
+    "pwsh": 2048,
+    "edit": 610,
+    "read": 514,
+    "web_fetch": 432,
+    "grep": 255,
+    "write": 239,
+    "read_image": 82,
+    "web_search": 63,
+    "glob": 50,
+    "map_driving_route": 47,
+    "map_geocode": 45,
+    "todo_write": 42,
+    "modlens_read_image": 39,
+    "job_output": 30,
+    "cordis_inspect_query": 25,
+    "ask_user_question": 24,
+    "present": 20,
+    "map_transit_route": 17,
+    "job_kill": 11,
+    "send_message": 10,
+    "map_poi_search": 7,
+    "subagent": 6,
+    "list_agents": 6,
+    "plugin_manager": 5,
+    "map_reverse_geocode": 5,
+    "map_walking_route": 4,
+    "cordis_inspect_list": 3,
+    "skill": 3,
+    "exit_plan_mode": 3,
+    "map_bicycling_route": 3,
+    "job_list": 3,
+    "describe_image": 1,
+    "create_goal": 1,
+    "get_goal": 1,
+    "update_goal": 1
+  },
+  "perTurnByThreshold": {
+    "1000": {
+      "triggeringTurns": 88,
+      "mean": 5.7727272727272725,
+      "p90": 16,
+      "max": 38,
+      "cappedMeanSeconds": 0.6647727272727273
+    },
+    "1500": {
+      "triggeringTurns": 79,
+      "mean": 4.6455696202531644,
+      "p90": 10,
+      "max": 27,
+      "cappedMeanSeconds": 0.6341772151898735
+    },
+    "2000": {
+      "triggeringTurns": 69,
+      "mean": 4.115942028985507,
+      "p90": 12,
+      "max": 21,
+      "cappedMeanSeconds": 0.6
+    },
+    "3000": {
+      "triggeringTurns": 53,
+      "mean": 3.6037735849056602,
+      "p90": 12,
+      "max": 18,
+      "cappedMeanSeconds": 0.5433962264150943
+    },
+    "6000": {
+      "triggeringTurns": 32,
+      "mean": 3.125,
+      "p90": 10,
+      "max": 12,
+      "cappedMeanSeconds": 0.515625
+    }
+  },
+  "projection": {
+    "assumedLatencyMs": 300,
+    "uncappedWorstSeconds": 8.1
+  },
+  "savings": {
+    "1000": {
+      "judged": 508,
+      "judgedTokens": 1991226.5,
+      "savedTokens": 1294297.2250000008,
+      "shareOfAll": 0.3795941738636257,
+      "triggeringTurns": 88
+    },
+    "1500": {
+      "judged": 367,
+      "judgedTokens": 1817443,
+      "savedTokens": 1181337.9500000011,
+      "shareOfAll": 0.34646524347141305,
+      "triggeringTurns": 79
+    },
+    "2000": {
+      "judged": 284,
+      "judgedTokens": 1674734.75,
+      "savedTokens": 1088577.587500001,
+      "shareOfAll": 0.31926029201949446,
+      "triggeringTurns": 69
+    },
+    "3000": {
+      "judged": 191,
+      "judgedTokens": 1443868.25,
+      "savedTokens": 938514.3625,
+      "shareOfAll": 0.2752494382365184,
+      "triggeringTurns": 53
+    },
+    "6000": {
+      "judged": 100,
+      "judgedTokens": 1067280.25,
+      "savedTokens": 693732.1625000001,
+      "shareOfAll": 0.20345920706645562,
+      "triggeringTurns": 32
+    }
+  },
+  "turnsWithFiles": {
+    "withFiles": 11,
+    "total": 252
+  },
+  "skillCatalog": {
+    "samples": 55,
+    "min": 27,
+    "p50": 29,
+    "p90": 31,
+    "max": 40
+  }
+}

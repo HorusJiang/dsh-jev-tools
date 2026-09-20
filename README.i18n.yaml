@@ -1,0 +1,13 @@
+# Consistency record for a pair of documents. Both files listed below must say the
+# same thing; these are the git blob hashes of each side at the last confirmed-
+# consistent state, so editing one side without re-recording goes red in
+# `test/docs.test.ts`.
+#
+# After editing either side, bring the other along and re-record the pair:
+#
+#   git hash-object README.md README.en.md
+#
+# That test recomputes these hashes with `node:crypto`, so no git and no repository
+# are needed, and it also checks that the two sides keep the same structure.
+README.md: c8c05c8565fd85934bcc2be3705629a36f996ee9
+README.en.md: 9c1e8fe36732cb8f4642045a6be9249d3b22d5b4
