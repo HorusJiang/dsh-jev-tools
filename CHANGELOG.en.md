@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.5` | 2026-09-21 | **published** | Fixes the Workshop manifest's adapter field; the capabilities are the same as `0.1.4`. |
 | `0.1.4` | 2026-09-21 | **published** | Adds the OMDSH Workshop manifest; the capabilities are the same as `0.1.3`. |
 | `0.1.3` | 2026-09-21 | **published** | README rewrite; the capabilities are the same as `0.1.2`. |
 | `0.1.2` | 2026-09-21 | **published** | Source installs work; the capabilities are the same as `0.1.1`. |
@@ -18,6 +19,12 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.5] — 2026-09-21
+
+### Fixed
+
+- `dshWorkshop.install.adapter` changed from `harness-cordis` to `third-party`: the OMDSH Workshop protocol mapping pairs `harness-cordis` with the `third-party` adapter, and using the protocol name as the adapter is rejected by its validator.
 
 ## [0.1.4] — 2026-09-21
 
