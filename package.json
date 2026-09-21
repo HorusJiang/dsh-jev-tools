@@ -1,6 +1,6 @@
 {
   "name": "dsh-jev-tools",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Gives DeepSeek Harness three automatic Jev judgments — prune oversized tool output, screen fetched pages for injected instructions, suggest which skill to use — plus the jev_ask and jev_gate tools, a persistent judgment ledger, and a /jev-status diagnosis command. Requires a TypeSafe API key; with none configured it is completely inert and makes no network request.",
   "type": "module",
   "main": "lib/index.js",
@@ -106,6 +106,54 @@
       "dshReleases": {
         "0.1.6-alpha.2": "compatible"
       }
+    }
+  },
+  "dshWorkshop": {
+    "schema": "omdsh-workshop-package/v1",
+    "type": "plugin",
+    "integration": {
+      "protocol": "harness-cordis",
+      "artifact": "cordis.patch.yml"
+    },
+    "install": {
+      "mode": "guided",
+      "adapter": "harness-cordis",
+      "failurePolicy": "manual",
+      "touchesCurrentBeforeActivation": false
+    },
+    "lifecycle": {
+      "activation": "restart-host",
+      "dispose": "unknown"
+    },
+    "permissions": [
+      "network:outbound",
+      "credentials:read",
+      "storage:read",
+      "storage:write",
+      "settings:read",
+      "session:append",
+      "skills:read",
+      "tools:register",
+      "commands:register",
+      "ui:extend",
+      "filesystem:none"
+    ],
+    "compatibility": {
+      "dshVersions": [
+        "0.1.6-alpha.2"
+      ]
+    },
+    "capability": {
+      "id": "jev-status",
+      "kind": "command",
+      "invocation": "/jev-status",
+      "expected": "prints whether the plugin is enabled, whether an API key was resolved and from where, the judgment and skip counts for this session, and where the ledger is stored; it answers with no API key configured"
+    },
+    "evidence": {
+      "install": "cordis.patch.yml",
+      "failureIsolation": null,
+      "hotReload": null,
+      "remove": null
     }
   },
   "repository": {

@@ -11,12 +11,19 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.4` | 2026-09-21 | **published** | Adds the OMDSH Workshop manifest; the capabilities are the same as `0.1.3`. |
 | `0.1.3` | 2026-09-21 | **published** | README rewrite; the capabilities are the same as `0.1.2`. |
 | `0.1.2` | 2026-09-21 | **published** | Source installs work; the capabilities are the same as `0.1.1`. |
 | `0.1.1` | 2026-09-21 | **published** | Documentation corrections; the capabilities are the same as `0.1.0`. |
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.4] — 2026-09-21
+
+### Added
+
+- `package.json` gains a `dshWorkshop` manifest (`omdsh-workshop-package/v1`) declaring the integration protocol, install mode, lifecycle, structured permissions, compatible releases, and one observable capability, for the intake of [OMDSH Hub](https://github.com/omdsh-dev/dsh-hub-workshop). It is metadata for the catalog and changes no behaviour inside DSH.
 
 ## [0.1.3] — 2026-09-21
 
