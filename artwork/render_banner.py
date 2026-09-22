@@ -229,10 +229,12 @@ def draw_topbar(img: Image.Image) -> None:
 def draw_content(img: Image.Image) -> None:
     f_eyebrow = font("mono_bold", 15)
     f_title = font("ui_bold", 68)
-    f_lede = font("cn_bold", 30)
-    f_tag = font("cn", 21)
+    f_lede = font("cn_bold", 40)
+    f_tag = font("cn", 22)
+    f_tag_lat = font("ui", 22)
     f_pill = font("cn", 15)
     f_foot = font("cn", 13)
+    f_foot_lat = font("ui", 13)
 
     d = ImageDraw.Draw(img)
 
@@ -245,7 +247,7 @@ def draw_content(img: Image.Image) -> None:
     d = ImageDraw.Draw(img)
 
     # ---- title（包名，不可翻译；无版本号：那是徽章与 CHANGELOG 的职责）
-    y_title = 66
+    y_title = 64
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ImageDraw.Draw(layer).text((u(PAD), u(baseline(f_title, y_title))), "dsh-jev-tools",
                                font=f_title, fill=INK, anchor="ls")
@@ -253,24 +255,20 @@ def draw_content(img: Image.Image) -> None:
     img.alpha_composite(layer)
     d = ImageDraw.Draw(img)
 
-    # ---- lede：banner 得自己回答「它是什么」。
-    # 口号回答不了这个问题（"判定，而非生成" 是性质，不是身份），所以这一行放
-    # 预诊台那句类比，并用暖色把它拎出来——三段共用一条基线，否则中文与拉丁
-    # 两套 ascender 会让这一行自己错位。
-    y_lede = 170
-    by_lede = baseline(f_lede, y_lede)
+    # ---- lede：口号，不是句子。
+    # 这里写错过一版：「它是大模型的预诊台：只分诊，不诊断」——「它是」是口语起手，
+    # 冒号是把话说满，读起来像在跟人唠嗑。banner 的标题只能是名词短语，所以就是
+    # 「大模型预诊台」六个字；需要展开的部分交给下面那行并列断言，再要展开的交给 README。
+    y_lede = 154
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ld = ImageDraw.Draw(layer)
-    x = draw_at(ld, PAD, y_lede, "它是", f_lede, "#C7D6EA", by=by_lede)
-    x = draw_at(ld, x, y_lede, "大模型的预诊台", f_lede, AMBER, by=by_lede)
-    draw_at(ld, x, y_lede, "：只分诊，不诊断", f_lede, "#8FA3BE", by=by_lede)
-    img.alpha_composite(glow(layer, 11, 0.5))
+    draw_spaced(ImageDraw.Draw(layer), PAD, y_lede, "大模型预诊台", f_lede, AMBER, 4.0)
+    img.alpha_composite(glow(layer, 12, 0.5))
     img.alpha_composite(layer)
     d = ImageDraw.Draw(img)
 
-    # ---- tagline
-    draw_at(d, PAD, 216, "不生成文本，也不替代主模型——只在关键节点插一次判定",
-            f_tag, DIM)
+    # ---- tagline：三段并列断言，段间只有分隔符，没有连接词
+    draw_mixed(d, PAD, 212, "判定，而非生成 · 只分诊，不诊断 · 不替代主模型",
+               f_tag, f_tag_lat, DIM)
 
     # ---- capability pills（与海报的四张卡片同名，两处不能各说各的）
     y_pill, pill_h, gap = 258, 34, 14
@@ -289,8 +287,10 @@ def draw_content(img: Image.Image) -> None:
         cx += pw + gap
 
     # ---- footer（两行不变，是这套设计的"性质"清单）
-    draw_at(d, PAD, 330, "带类型的问题 · 返回概率 · 无需解析 · 一次请求", f_foot, DIMMER)
-    draw_at(d, PAD, 352, "无 key 完全惰性 · 绝不阻挡步骤 · 每次判定都记账", f_foot, DIMMER)
+    draw_mixed(d, PAD, 328, "带类型的问题 · 返回概率 · 无需解析 · 一次请求",
+               f_foot, f_foot_lat, DIMMER)
+    draw_mixed(d, PAD, 350, "无 key 完全惰性 · 绝不阻挡步骤 · 每次判定都记账",
+               f_foot, f_foot_lat, DIMMER)
 
 
 def main() -> None:
