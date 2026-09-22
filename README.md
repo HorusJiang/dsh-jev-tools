@@ -60,6 +60,8 @@ dsh plugin --profile web add dsh-jev-tools
 
 `--profile` **必填**：它把其后的参数原样转发给该 profile 目录里的 `pnpm`。`web` 是桌面 / Web 应用所用的 profile，请换成你实际在跑的那个。也可以直接在 DSH 的插件页面里按包名 / GitHub 地址安装——那条路径会**一步完成安装并启用**。
 
+这条命令做的是**装包 + 把它注册成 profile 的一层**：本包的 `package.json` 声明了 `dsh.bundle`，安装器据此把包名写进 `dsh.profile.bundles`，而 DSH 的加载器只解析那个列表。所以**不要用 `npm install dsh-jev-tools` 代替**——那只会把包放进 `node_modules`；npm 不认识 `dsh.profile.bundles` 这个字段，包在磁盘上，插件一个字节都不会运行。
+
 ## 配置 API key
 
 **没配 key 时插件完全惰性**：正常挂载、所有能力都不生效、**不发任何网络请求**。三种方式任选一种，都不用重启：

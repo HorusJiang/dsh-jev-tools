@@ -60,6 +60,8 @@ dsh plugin --profile web add dsh-jev-tools
 
 `--profile` is **required**: everything after it is forwarded verbatim to `pnpm` in that profile's directory. `web` is the profile behind the desktop / web app — use whichever profile you actually run. You can also install from DSH's plugin page by package name or GitHub URL, which installs *and enables* it in one step.
 
+That command **installs the package and registers it as a profile layer**: this package declares `dsh.bundle`, and on that basis the installer writes its name into `dsh.profile.bundles` — the only list DSH's loader reads. So **do not substitute `npm install dsh-jev-tools`**: that only drops the package into `node_modules`, npm knows nothing about `dsh.profile.bundles`, and the package sits on disk while not a byte of the plugin runs.
+
 ## Configure the API key
 
 **With no key the plugin is completely inert**: it mounts, nothing takes effect, and it makes **no network request at all**. Any one of three ways works, and none needs a restart:

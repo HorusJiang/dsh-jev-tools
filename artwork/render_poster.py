@@ -282,6 +282,8 @@ def draw_content(img: Image.Image) -> None:
     f_cmd = font("mono_bold", 27)
     f_hint = font("cn", 19)
     f_mkt = font("cn", 18)
+    f_repo = font("mono", 25)
+    f_repo_b = font("mono_bold", 25)
     f_foot = font("cn_bold", 20)
     f_foot2 = font("mono", 20)
 
@@ -348,7 +350,7 @@ def draw_content(img: Image.Image) -> None:
     draw_at(d, tx + 20, yb + 6, "判定，而非生成", f_tag, "#8FA3BE")
 
     # ---- feature grid（四个节点）
-    gy, cw, ch, gap = 516, (CONTENT_W - 18) / 2, 186, 18
+    gy, cw, ch, gap = 516, (CONTENT_W - 18) / 2, 172, 18
     cards = [
         (CYAN, "01", "精简工具输出", "超长工具结果逐段判定相关性，\n丢掉不相关的段落。", "实测 4613 → 2624 tokens"),
         (AMBER, "02", "注入筛查", "抓回的网页正文里，\n有没有写给 AI 的指令？", "只提醒 · 不拦截 · 不改写"),
@@ -374,12 +376,12 @@ def draw_content(img: Image.Image) -> None:
 
         draw_at(d, bx + 40 + 13, by + 4, title, f_card_h, "#F0F6FF")
         for j, line in enumerate(desc.split("\n")):
-            draw_at(d, cx + 24, by + 40 + 10 + j * 31, line, f_card_p, "#96A9C2")
-        draw_mixed(d, cx + 24, by + 40 + 10 + 62 + 10, metric,
+            draw_at(d, cx + 24, by + 40 + 10 + j * 29, line, f_card_p, "#96A9C2")
+        draw_mixed(d, cx + 24, by + 40 + 10 + 58 + 10, metric,
                    f_metric, f_metric_m, accent)
 
     # ---- 为什么不是「再问一次 LLM」
-    ky, kh = gy + 2 * ch + gap + 18, 186
+    ky, kh = gy + 2 * ch + gap + 18, 176
     kbox = (PAD, ky, PAD + CONTENT_W, ky + kh)
     panel(img, kbox, 16, (8, 16, 30, 150), (255, 255, 255, 30))
     d = ImageDraw.Draw(img)
@@ -404,32 +406,43 @@ def draw_content(img: Image.Image) -> None:
             d.ellipse((u(x + 1), u(by2 + 9), u(x + 6), u(by2 + 14)), fill=accent)
             draw_at(d, x + 18, by2, b, f_blk_b, "#AEBFD4")
 
-    draw_at(d, PAD + 24, ky + 148,
+    draw_at(d, PAD + 24, ky + 140,
             "所以它不替代主模型——只在关键节点插一次高效判定。", f_blk_f, "#DCE7F7")
 
     # ---- 三条性质（作用域必须写明：闸门刻意相反）
-    py, ph = ky + kh + 12, 46
+    py, ph = ky + kh + 12, 42
     panel(img, (PAD, py, PAD + CONTENT_W, py + ph), 14, (8, 16, 30, 140), (255, 255, 255, 28))
     d = ImageDraw.Draw(img)
-    x = draw_at(d, PAD + 24, py + 13, "精简与筛查共享：", f_strip_l, "#7E93AE")
-    draw_at(d, x, py + 12, "只排序不卡阈值  ·  确定性保底  ·  失败即放行", f_strip, "#C6D6E9")
+    x = draw_at(d, PAD + 24, py + 10, "精简与筛查共享：", f_strip_l, "#7E93AE")
+    draw_at(d, x, py + 9, "只排序不卡阈值  ·  确定性保底  ·  失败即放行", f_strip, "#C6D6E9")
 
-    # ---- install（按你的要求走 npm）
-    iy, ih = py + ph + 12, 116
+    # ---- install
+    # `dsh plugin … add` 而不是 `npm install`：只有前者会在装包之后把包名写进
+    # `dsh.profile.bundles`（plugin-manager 的 reconcile），而 DSH 只解析那个列表。
+    # 纯 npm 安装会把包留在 node_modules 里、profile 一个字不改，DSH 永远不挂载它。
+    iy, ih = py + ph + 12, 112
     panel(img, (PAD, iy, PAD + CONTENT_W, iy + ih), 16, (2, 6, 13, 150),
           rgb_of(CYAN) + (77,))
     d = ImageDraw.Draw(img)
-    draw_spaced(d, PAD + 24, iy + 16, "INSTALL", f_lbl, "#5E7C99", 3.0)
-    x = draw_at(d, PAD + 24, iy + 44, "$ ", f_cmd, GREEN)
-    draw_at(d, x, iy + 44, "npm install dsh-jev-tools", f_cmd, "#EAF4FF")
-    x = draw_at(d, PAD + 24, iy + 86, "或在 DSH 插件页按包名安装——", f_hint, "#7F93AD")
-    x = draw_at(d, x, iy + 86, "一步完成安装并启用", f_hint, "#9FE8F2")
+    draw_spaced(d, PAD + 24, iy + 13, "INSTALL", f_lbl, "#5E7C99", 3.0)
+    x = draw_at(d, PAD + 24, iy + 38, "$ ", f_cmd, GREEN)
+    draw_at(d, x, iy + 38, "dsh plugin --profile web add dsh-jev-tools", f_cmd, "#EAF4FF")
+    x = draw_at(d, PAD + 24, iy + 76, "或在 DSH 插件页按包名安装——", f_hint, "#7F93AD")
+    x = draw_at(d, x, iy + 76, "一步完成安装并启用", f_hint, "#9FE8F2")
 
-    # ---- 市场收录
-    my = iy + ih + 18
-    draw_mixed(d, PAD, my,
-               "已收录 awesome-dsh-plugin 权威目录（16.6k★），dsh-market 等镜像商城自动同步",
-               f_mkt, f_mkt, "#7E93AE")
+    # ---- repository + 市场收录
+    # 包名可能重名，账户不会：把 HorusJiang 做成这一行里最醒目的部分。
+    ry, rh = iy + ih + 12, 80
+    panel(img, (PAD, ry, PAD + CONTENT_W, ry + rh), 14, (8, 16, 30, 155),
+          rgb_of(CYAN) + (56,))
+    d = ImageDraw.Draw(img)
+    draw_spaced(d, PAD + 24, ry + 11, "REPOSITORY", f_lbl, "#5E7C99", 3.0)
+    markets = "已收录 awesome-dsh-plugin 权威目录（16.6k★），dsh-market 等镜像商城自动同步"
+    mw = width_of(d, markets, f_mkt)
+    draw_mixed(d, PAD + CONTENT_W - 24 - mw, ry + 12, markets, f_mkt, f_mkt, "#5E7C99")
+    x = draw_at(d, PAD + 24, ry + 38, "github.com/", f_repo, "#7F93AD")
+    x = draw_at(d, x, ry + 38, "HorusJiang", f_repo_b, CYAN)
+    draw_at(d, x, ry + 38, "/dsh-jev-tools", f_repo_b, "#EAF4FF")
 
     # ---- footer
     fy = 1360

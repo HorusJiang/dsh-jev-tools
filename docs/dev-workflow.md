@@ -144,7 +144,18 @@ dsh plugin --profile <name> <pnpm 参数…>
 
 - `--profile` 是 **`requiredOption`**——所以 `dsh plugin add <pkg>` 是**错的**（缺 `--profile`，Commander 直接拒）
 - `--profile` 之后的参数**原样转发给 profile 目录里的 `pnpm`**（`add` / `remove` / `why` / …）
-- **它只装包，不启用**。插件页面那条路才是一步装好并启用
+- **`add` 是"装包 + 启用"一步完成的**，插件页面那条路只是同一件事的另一个入口。
+
+  **这一条以前写反了**（原文是「它只装包，不启用」），2026-09-22 读源码更正。pnpm 成功后，
+  `plugin-manager` 会跑一次 `reconcile()`（`packages/boot/plugin-manager/src/operations.ts`）：
+  遍历**新装的依赖**，凡是声明了 `dsh.bundle` 的就把包名 push 进 `dsh.profile.bundles` 并存盘。
+  它由 `:160` 的 `if (exitCode === 0 && options.activateNewBundles !== false)` 触发，而
+  `apps/cli/src/plugin.ts` 调用时**没有传** `activateNewBundles`，所以 `dsh plugin` 这条路上它必然执行。
+
+  **推论（海报和 README 都依赖它）**：`npm install dsh-jev-tools` **不能**让 DSH 加载这个插件。
+  它只把包放进 `node_modules`，而 npm 不知道 `dsh.profile.bundles` 这个字段；DSH 的加载器只解析
+  那个列表（`packages/boot/app-boot/src/profile.ts`）。结果就是包在磁盘上、插件一个字节都没跑起来。
+  唯一能让它生效的入口是 `dsh plugin --profile <name> add`，或插件页面。
 
 ## 10. 这台机器上的 shell 不是 UTF-8 安全的，读也不行
 
