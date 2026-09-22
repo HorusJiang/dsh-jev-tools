@@ -73,3 +73,34 @@ jobs:
       # publish grant and attaches provenance itself for a public package.
       - name: Publish to npm
         run: npm publish
+
+  # A separate job with separate permissions on purpose: creating a Release
+  # writes to the repository, and the job that exchanges an OIDC token for a
+  # publish grant should not also be able to write to it. Least privilege per
+  # job, not per workflow.
+  #
+  # It runs only after a successful publish, so a release note never announces a
+  # version that did not make it to the registry.
+  release:
+    name: GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The body is the changelog section for this version — both language sides,
+      # because they are peers rather than an original and a summary. The script
+      # exits non-zero when the section is missing, which is the point: an empty
+      # release is worse than a red workflow, since nobody sees it fail.
+      - name: Create the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/release-notes.ts "${GITHUB_REF_NAME#v}" > release-notes.md
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md
+

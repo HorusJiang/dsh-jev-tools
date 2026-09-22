@@ -156,8 +156,9 @@ The plugin follows your language in both directions with no configuration: the s
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 216 tests (node --test, no test framework)
+npm test                         # builds first, then runs 222 tests (node --test, no test framework)
 node scripts/check-tarball.mjs   # asserts the published tarball carries no local state and nothing is missing
+node scripts/release-notes.ts 0.1.7  # preview a version's GitHub Release body (the workflow calls this on release)
 npm run trigger-rate             # trigger rates from local session logs — no key, no network
 npm run measure -- --ledger      # read the local ledger; reports net savings over DSH's own truncation
 ```
@@ -168,7 +169,7 @@ npm run measure -- --ledger      # read the local ledger; reports net savings ov
 
 After changing `lib/` you **must restart `dsh web`**: toggling the plugin off and on does not re-import ESM modules.
 
-Pushing to `main` runs CI (ubuntu + windows × node 24: `npm ci` → `npm test` → tarball check). Releases are driven by a tag: pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against the version in `package.json`, runs the same gates, and publishes through npm trusted publishing (no long-lived token; the trusted publisher has to be configured once on npm — the steps are in the workflow's header comment).
+Pushing to `main` runs CI (ubuntu + windows × node 24: `npm ci` → `npm test` → tarball check). Releases are driven by a tag: pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against the version in `package.json`, runs the same gates, and publishes through npm trusted publishing (no long-lived token; the trusted publisher has to be configured once on npm — the steps are in the workflow's header comment). Once npm has accepted the publish, the same workflow creates a **GitHub Release** whose body is that version's section of **both** changelogs — the two sides are peer texts rather than a translation summary, so the release carries both.
 
 ## License
 

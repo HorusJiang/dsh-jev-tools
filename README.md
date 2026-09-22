@@ -156,8 +156,9 @@ npm run measure -- samples.jsonl # 有标注（{p, y}）的数据：准确率、
 
 ```bash
 npm install --cache .npm-cache   # 依赖极少
-npm test                         # 先构建，再跑 216 个测试（node --test，无测试框架依赖）
+npm test                         # 先构建，再跑 222 个测试（node --test，无测试框架依赖）
 node scripts/check-tarball.mjs   # 断言发布包里既没有本机状态、也不缺该有的文件（CI 与发布前都跑）
+node scripts/release-notes.ts 0.1.7  # 预览某个版本的 GitHub Release 正文（发布时由 workflow 调用）
 npm run trigger-rate             # 从本地会话日志统计触发率，无需 key、无网络
 npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH 自带截断的净增量
 ```
@@ -168,7 +169,7 @@ npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH �
 
 改了 `lib/` 之后**必须重启 `dsh web`**：关开插件开关不会重新导入 ESM 模块。
 
-推送到 `main` 会自动跑 CI（ubuntu + windows × node 24：`npm ci` → `npm test` → tarball 检查）。发布靠打 tag：推一个 `v*` tag 会走 `.github/workflows/release.yml`——先校验 tag 与 `package.json` 的版本一致，再跑同一套门禁，最后经 npm trusted publishing 发布（无长期 token；首次需在 npm 侧配置一次 trusted publisher，workflow 头部注释里有步骤）。
+推送到 `main` 会自动跑 CI（ubuntu + windows × node 24：`npm ci` → `npm test` → tarball 检查）。发布靠打 tag：推一个 `v*` tag 会走 `.github/workflows/release.yml`——先校验 tag 与 `package.json` 的版本一致，再跑同一套门禁，最后经 npm trusted publishing 发布（无长期 token；首次需在 npm 侧配置一次 trusted publisher，workflow 头部注释里有步骤）。npm 接受之后，同一个 workflow 会再建一条 **GitHub Release**，正文就是 CHANGELOG 里该版本的**两种语言正文**——两边是对等正文而非译文摘要，所以 Release 不做取舍。
 
 ## License
 
