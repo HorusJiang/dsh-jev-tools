@@ -266,6 +266,38 @@ test('records accumulate, and the A/B increment is separated from the baseline',
   assert.deepEqual(summary.models, { 'jev-1.13.0': 3 })
 })
 
+test('input tokens accumulate into the spend counter', () => {
+  const medium = createMedium()
+  const domain = new FakeDomain(LEDGER_DOMAIN_NAME, medium, ledgerDomainSpec())
+  const ledger = createDomainLedger({ domain })
+
+  ledger.record(record({ ts: 1, inputTokens: 1_200 }))
+  ledger.record(record({ ts: 2, feature: 'suggest', outcome: 'judged', inputTokens: 800 }))
+  ledger.record(record({ ts: 3, feature: 'prune', outcome: 'skipped', skip: 'no-key' }))
+
+  // Input is the only thing billed, and a declined attempt carries no usage —
+  // nothing was sent, so nothing was charged.
+  assert.equal(ledger.summary().spentTokens, 2_000)
+})
+
+test('a counters row written before the spend counter still loads', () => {
+  // Adding a *required* field would make an older row fail validation, and with
+  // `invalidRecords: 'backup-and-skip'` that would move the row aside — quietly
+  // discarding the cumulative history it exists to carry. The field is optional
+  // for exactly this reason, so the test asserts the old row is accepted.
+  const medium = createMedium()
+  const older = { records: 5, judged: 4, skipped: 1, savedTokens: 100, baselineSavedTokens: 40, netTokens: 60 }
+  medium.tables.set(TOTALS_TABLE, new Map([[TOTALS_KEY, older]]))
+  const domain = new FakeDomain(LEDGER_DOMAIN_NAME, medium, ledgerDomainSpec())
+  const ledger = createDomainLedger({ domain })
+
+  assert.deepEqual(domain.rejected, [], 'the older row must not be backed up')
+  const summary = ledger.summary()
+  assert.equal(summary.records, 5, 'the counters that were carried survive')
+  assert.equal(summary.savedTokens, 100)
+  assert.equal(summary.spentTokens, 0, 'a counter the old row cannot carry reads as zero')
+})
+
 test('a record with no baseline measurement credits the whole saving to this plugin', () => {
   // An absent baseline means the deterministic pruner was not there to measure,
   // so it would have removed nothing. Attributing the saving elsewhere would

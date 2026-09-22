@@ -37,7 +37,11 @@
  */
 
 import fs from 'node:fs'
-import { apply, expectedCalibrationError, fit, fitPlatt, fitIsotonic, type Sample } from '../src/calibrate.ts'
+import {
+  apply, auc, bestOperatingPoint, expectedCalibrationError, fit, fitPlatt, fitIsotonic,
+  sweepThresholds, type Sample,
+} from '../src/calibrate.ts'
+import { estimateCostUsd, USD_PER_MTOK } from '../lib/request.js'
 import { defaultStorageRoot, ledgerDomainDir, readLedgerRecords, type LedgerGaps, type LedgerTotals } from './lib/ledger-files.ts'
 import type { JudgmentRecord } from '../lib/ledger.js'
 
@@ -49,9 +53,6 @@ interface LabelledRecord {
   readonly latencyMs?: number
   readonly inputTokens?: number
 }
-
-/** Input price: $0.042 per million tokens, output free. */
-const USD_PER_MTOK = 0.042
 
 // ── argument parsing ────────────────────────────────────────────────────────
 
@@ -179,6 +180,37 @@ function reportCalibration (records: LabelledRecord[], source: string): Record<s
   console.log('\n--- reliability (predicted vs observed, by bin) ---')
   for (const line of reliability(samples)) console.log(line)
 
+  // Ranking is a different question from calibration: a model can be badly
+  // calibrated and still separate the classes perfectly. It is the ranking that
+  // a threshold turns into a decision, so it is measured separately.
+  const positives = samples.filter(sample => sample.y === 1).length
+  if (positives > 0 && positives < samples.length) {
+    const ranking = auc(samples)
+    console.log('\n--- ranking (can it tell the classes apart at all?) ---')
+    console.log(`  AUC           : ${ranking.toFixed(3)}`)
+    report.ranking = { auc: ranking }
+
+    const points = sweepThresholds(samples)
+    const best = bestOperatingPoint(points)
+    if (best !== undefined) {
+      console.log('\n--- thresholds (what a gate would need) ---')
+      console.log('  p >=   precision   recall       F1  called')
+      for (const point of points) {
+        console.log(`  ${point.threshold.toFixed(2)}     ${point.precision.toFixed(3)}     `
+          + `${point.recall.toFixed(3)}    ${point.f1.toFixed(3)}  ${String(point.predicted).padStart(4)}`
+          + `${point === best ? '  <- best F1' : ''}`)
+      }
+      console.log(`  best F1 ${best.f1.toFixed(3)} at p >= ${best.threshold.toFixed(2)} `
+        + `(precision ${best.precision.toFixed(3)}, recall ${best.recall.toFixed(3)}, ${best.predicted} called)`)
+      console.log('  A tie goes to the higher threshold: the same F1 with less attention spent.')
+      report.thresholds = { best, points }
+    }
+  } else {
+    console.log('\n--- ranking ---')
+    console.log('  one class only, so nothing can be ranked (AUC reported as the no-information 0.5)')
+    report.ranking = { auc: 0.5, note: 'single-class set' }
+  }
+
   // Reported as in-sample, which is optimistic; the gap still shows the
   // direction and rough size of the correction.
   const model = records[0]?.model ?? 'unknown'
@@ -206,10 +238,11 @@ function reportCalibration (records: LabelledRecord[], source: string): Record<s
   }
   const tokens = records.reduce((sum, r) => sum + (r.inputTokens ?? 0), 0)
   if (tokens > 0) {
-    const cost = (tokens / 1_000_000) * USD_PER_MTOK
+    const cost = estimateCostUsd(tokens)
     console.log('\n--- cost (input only; output is free) ---')
     console.log(`  ${tokens} input tokens total → $${cost.toFixed(6)}`)
     console.log(`  $${((cost / records.length) * 1_000).toFixed(4)} per 1,000 judgments`)
+    console.log(`  (input billed at $${USD_PER_MTOK} per million tokens, the one price this project uses)`)
     report.cost = { inputTokens: tokens, usd: cost }
   }
 
@@ -343,11 +376,21 @@ function reportLedger (
   }
 
   const tokens = records.reduce((sum, entry) => sum + (entry.inputTokens ?? 0), 0)
-  if (tokens > 0) {
-    const cost = (tokens / 1_000_000) * USD_PER_MTOK
+  // The window above and the cumulative counter below are different numbers for
+  // the same reason the record counters are: retention is bounded, so a total
+  // recomputed from what is still on disk would shrink as the plugin is used.
+  const spentTokens = totals?.spentTokens ?? 0
+  if (tokens > 0 || spentTokens > 0) {
     console.log('\n--- cost (input only; output is free) ---')
-    console.log(`  ${tokens} input tokens total → $${cost.toFixed(6)}`)
-    report.cost = { inputTokens: tokens, usd: cost }
+    if (tokens > 0) {
+      console.log(`  this window          ${tokens} input tokens → $${estimateCostUsd(tokens).toFixed(6)}`)
+      report.cost = { inputTokens: tokens, usd: estimateCostUsd(tokens) }
+    }
+    if (spentTokens > 0) {
+      console.log(`  cumulative on medium ${spentTokens} input tokens → $${estimateCostUsd(spentTokens).toFixed(6)}`)
+      report.totalCost = { inputTokens: spentTokens, usd: estimateCostUsd(spentTokens) }
+    }
+    console.log(`  (input billed at $${USD_PER_MTOK} per million tokens; output is free)`)
   }
 
   const versions = new Map<string, number>()

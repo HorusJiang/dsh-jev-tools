@@ -24,12 +24,14 @@
 
 import { JevError } from '../backends/jev.js'
 import { resolveApiKey } from '../credentials.js'
+import { reasonFromFailure } from '../degrade.js'
 import { detectLang, t } from '../i18n.js'
 import type { DecisionBackend, JudgmentRequest } from '../backends/types.js'
 import type { JevSettings } from '../config.js'
 import type { ContextCache } from '../context-cache.js'
 import type { Budget } from '../budget.js'
 import type { Ledger } from '../ledger.js'
+import type { DegradeNotices } from '../notify.js'
 import type {
   CredentialsService, PreStepDecision, PreStepListener, SkillsService,
 } from '../host.js'
@@ -52,6 +54,8 @@ export interface SkillSuggestDeps {
   readonly cache: ContextCache
   readonly budget: Budget
   readonly ledger: Ledger
+  /** Where a structural decline is reported, so it is not silent. */
+  readonly notices: DegradeNotices
   readonly now: () => number
   readonly newMessageId: () => string
   /** Optional diagnostics sink; absent is fine. */
@@ -96,7 +100,10 @@ export function createSkillSuggestListener (deps: SkillSuggestDeps): PreStepList
     if (catalog.length < settings.suggest.minCatalogSize) return downstream
 
     const apiKey = await resolveApiKey(deps.credentials(), settings.apiKeyEnv)
-    if (!apiKey.ok) return downstream
+    if (!apiKey.ok) {
+      deps.notices.note(agentId, 'no-key')
+      return downstream
+    }
 
     const grant = deps.budget.tryConsume(agentId, payload.turn)
     if (!grant.ok) return downstream
@@ -135,6 +142,7 @@ export function createSkillSuggestListener (deps: SkillSuggestDeps): PreStepList
       judged = await deps.backendFor(apiKey.value, model).judge(request, payload.signal)
     } catch (error) {
       const problem = error instanceof JevError ? error.problem : 'unknown'
+      deps.notices.note(agentId, reasonFromFailure(problem))
       deps.ledger.record({
         ts: deps.now(), agentId, feature: 'suggest', backendId: 'jev', model: '',
         latencyMs: deps.now() - started, outcome: 'skipped', skip: problem as never,

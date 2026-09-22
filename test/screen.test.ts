@@ -16,6 +16,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { createPruneListener } from '../lib/features/prune.js'
+import { createDegradeNotices } from '../lib/notify.js'
 import { INJECTION_ID, injectionNotice, injectionQuestion, planScreening, readInjection } from '../lib/features/screen.js'
 import { resolveSettings } from '../lib/config.js'
 import { createBudget } from '../lib/budget.js'
@@ -109,6 +110,7 @@ function harness (options: {
     budget: createBudget(settings.prune.perTurnLimit, settings.sessionCallLimit),
     memo: createMemo(),
     ledger,
+    notices: createDegradeNotices(),
     now: () => 1_000,
     newMessageId: () => `notice-${(messages += 1)}`,
   })

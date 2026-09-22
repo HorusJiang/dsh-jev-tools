@@ -1,0 +1,45 @@
+name: ci
+
+# Every push to main and every pull request, on both platforms this plugin
+# claims to support. Windows is not decoration here: the plugin is developed on
+# it, and a suite that only ever ran on Linux is evidence about Linux.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # A red run on one platform must not hide the other's result: "it works"
+      # is only true when both ran.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['24']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # `npm ci` requires the lockfile to match package.json, which is a check
+      # in its own right: a dependency edited without regenerating the lock
+      # fails here rather than after a publish.
+      - name: Install
+        run: npm ci
+
+      # `pretest` builds first, so this is both the compiled artifact's
+      # type-check and the suite that runs against it.
+      - name: Build and test
+        run: npm test
+
+      # The publish path runs this too; running it on every push means a change
+      # that would ship local state is caught long before a tag exists.
+      - name: The tarball carries nothing local
+        run: node scripts/check-tarball.mjs

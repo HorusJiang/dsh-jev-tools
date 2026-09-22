@@ -185,17 +185,22 @@ export function buildBody (request: JudgmentRequest, model: string): Record<stri
 /** The endpoint every model shares; the `model` field selects. */
 export const SYSTEM_ONE_PATH = '/v1/systemone'
 
+/** Input price in US dollars per million tokens. Output is not billed. */
+export const USD_PER_MTOK = 0.042
+
 /**
  * Estimate the cost of one request, in US dollars.
  *
- * Input is billed at $0.042 per million tokens and output is free, so this is
- * exact given a token count — it exists to make spend visible, not to predict it.
+ * Input is billed at {@link USD_PER_MTOK} per million tokens and output is free,
+ * so this is exact given a token count — it exists to make spend visible, not to
+ * predict it. The price lives here rather than at each place that prints money,
+ * because two copies of a price drift.
  *
  * @param inputTokens - the request's input tokens.
  * @returns the cost in dollars.
  */
 export function estimateCostUsd (inputTokens: number): number {
-  return (inputTokens / 1_000_000) * 0.042
+  return (inputTokens / 1_000_000) * USD_PER_MTOK
 }
 
 /** Re-exported so callers measuring a raw string do not need two imports. */

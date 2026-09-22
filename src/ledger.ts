@@ -86,6 +86,16 @@ export interface LedgerTotals {
    * about to cut something relevant.
    */
   readonly netTokens: number
+  /**
+   * Input tokens sent to the judgment service, cumulative.
+   *
+   * Input is the only thing billed — output is free — so this is the cost
+   * counter, and `estimateCostUsd` turns it into dollars wherever spend is
+   * shown. It is a counter of its own rather than something recomputed from the
+   * retained records, for the same reason as the others: eviction must not make
+   * spend look smaller than it was.
+   */
+  readonly spentTokens: number
 }
 
 /** Aggregate view over the retained records plus the cumulative counters. */
@@ -120,6 +130,7 @@ export interface Ledger {
 /** The zero value of {@link LedgerTotals}. */
 export const EMPTY_TOTALS: LedgerTotals = {
   records: 0, judged: 0, skipped: 0, savedTokens: 0, baselineSavedTokens: 0, netTokens: 0,
+  spentTokens: 0,
 }
 
 /** Does this record contribute to the prune A/B measurement? */
@@ -137,6 +148,10 @@ function measuresPrune (entry: JudgmentRecord): boolean {
 export function addToTotals (totals: LedgerTotals, entry: JudgmentRecord): LedgerTotals {
   const judged = entry.outcome === 'judged'
   let { savedTokens, baselineSavedTokens, netTokens } = totals
+  // Summed for every record that carries a count, judged or not: a record only
+  // has `inputTokens` when a response came back with usage, which is exactly
+  // when the tokens were billed.
+  const spentTokens = totals.spentTokens + (entry.inputTokens ?? 0)
   if (measuresPrune(entry)) {
     const original = entry.originalTokens ?? 0
     const kept = entry.keptTokens ?? 0
@@ -157,6 +172,7 @@ export function addToTotals (totals: LedgerTotals, entry: JudgmentRecord): Ledge
     savedTokens,
     baselineSavedTokens,
     netTokens,
+    spentTokens,
   }
 }
 

@@ -45,7 +45,7 @@
  * @module dsh-jev-tools/ledger-domain
  */
 
-import { addToTotals, summarize, totalsOf, type JudgmentRecord, type Ledger, type LedgerTotals } from './ledger.js'
+import { addToTotals, EMPTY_TOTALS, summarize, totalsOf, type JudgmentRecord, type Ledger, type LedgerTotals } from './ledger.js'
 import type { DomainLike, DomainTableLike } from './host.js'
 
 /** Domain name on the medium. Must match `/^[a-z][a-z0-9_]*$/`. */
@@ -202,6 +202,12 @@ export function judgmentSchema (): RecordSchema<JudgmentRecord> {
 /**
  * The stored counters schema.
  *
+ * `spentTokens` is **optional on purpose**. Adding a required field would make
+ * every counters row written by an earlier release fail validation, and with
+ * `invalidRecords: 'backup-and-skip'` that row would be moved aside — silently
+ * discarding the cumulative history the row exists to carry. Optional means an
+ * old row still parses, and the reader fills the gap with zero.
+ *
  * @returns the schema.
  */
 export function totalsSchema (): RecordSchema<LedgerTotals> {
@@ -212,6 +218,7 @@ export function totalsSchema (): RecordSchema<LedgerTotals> {
     { key: 'savedTokens', kind: 'number' },
     { key: 'baselineSavedTokens', kind: 'number' },
     { key: 'netTokens', kind: 'number' },
+    { key: 'spentTokens', kind: 'number', optional: true },
   ])
 }
 
@@ -310,7 +317,11 @@ export function createDomainLedger (options: DomainLedgerOptions): Ledger {
   const stored = totalsTable.get(TOTALS_KEY)
   // No stored counters means either a first run or a run that predates the
   // totals table; the retained records are the only evidence available.
-  let totals: LedgerTotals = stored ?? totalsOf(rows.map(row => row.value))
+  // A stored row is merged over the zero value so a counter added by a later
+  // release (which the old row cannot carry) reads as zero instead of undefined.
+  let totals: LedgerTotals = stored === undefined
+    ? totalsOf(rows.map(row => row.value))
+    : { ...EMPTY_TOTALS, ...stored }
 
   let failures = 0
   let chain: Promise<void> = Promise.resolve()

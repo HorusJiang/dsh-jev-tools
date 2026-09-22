@@ -12,6 +12,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { createSkillSuggestListener } from '../lib/features/skill-suggest.js'
+import { createDegradeNotices } from '../lib/notify.js'
 import { resolveSettings } from '../lib/config.js'
 import { createBudget } from '../lib/budget.js'
 import { createMemoryLedger } from '../lib/ledger.js'
@@ -48,6 +49,7 @@ function harness (options: {
 } = {}) {
   const cache = createContextCache()
   const ledger = createMemoryLedger()
+  const notices = createDegradeNotices()
   let judgeCalls = 0
   const listener = createSkillSuggestListener({
     settings: () => options.settings ?? SETTINGS,
@@ -75,10 +77,11 @@ function harness (options: {
     cache,
     budget: createBudget(3, 200),
     ledger,
+    notices,
     now: () => 1_000,
     newMessageId: () => 'notice-1',
   })
-  return { listener, cache, ledger, calls: () => judgeCalls }
+  return { listener, cache, ledger, notices, calls: () => judgeCalls }
 }
 
 /** A `next` that records that it ran and preserves the messages. */
@@ -193,10 +196,12 @@ test('a missing key sends nothing', async () => {
     resolve: async () => undefined,
     describe: async () => ({ configured: false, writable: true }),
   }
-  const { listener, cache, calls } = harness({ key: empty })
+  const { listener, cache, notices, calls } = harness({ key: empty })
   cache.remember('agent-1', '帮我加一个导出功能')
   await listener(payload(), passthrough({ count: 0 }))
   assert.equal(calls(), 0)
+  // Silence here is otherwise indistinguishable from "nothing to suggest".
+  assert.equal(notices.take('agent-1'), 'no-key')
 })
 
 test('the abstention option produces silence, not a guess', async () => {

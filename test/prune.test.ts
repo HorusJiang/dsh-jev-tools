@@ -12,6 +12,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { chunkText, createPruneListener, reassemble, selectChunks } from '../lib/features/prune.js'
+import { JevError } from '../lib/backends/jev.js'
+import { createDegradeNotices } from '../lib/notify.js'
 import { resolveSettings } from '../lib/config.js'
 import { createBudget } from '../lib/budget.js'
 import { createContextCache } from '../lib/context-cache.js'
@@ -62,6 +64,7 @@ function harness (options: {
 } = {}) {
   const cache = createContextCache()
   const ledger = createMemoryLedger()
+  const notices = createDegradeNotices()
   const judgeCalls: unknown[] = []
   // A holder rather than a constant, so a test can change settings between
   // calls — which is the only way to prove that a mode does not leak state.
@@ -91,10 +94,11 @@ function harness (options: {
     budget: createBudget(holder.value.prune.perTurnLimit, holder.value.sessionCallLimit),
     memo: createMemo(),
     ledger,
+    notices,
     now: () => 1_000,
     newMessageId: () => 'notice-1',
   })
-  return { listener, cache, ledger, judgeCalls, holder }
+  return { listener, cache, ledger, notices, judgeCalls, holder }
 }
 
 const EXEC = {
@@ -180,12 +184,41 @@ test('a blocked call is passed through untouched and never judged', async () => 
 })
 
 test('without a resolved key nothing is judged and the skip is recorded', async () => {
-  const { listener, cache, ledger, judgeCalls } = harness({ key: EMPTY })
+  const { listener, cache, ledger, notices, judgeCalls } = harness({ key: EMPTY })
   cache.remember('agent-1', 'do the thing')
   const decision = await listener(EXEC, { isError: false, content: [{ type: 'text', text: payload(30) }] }, accept)
   assert.deepEqual(decision, { kind: 'accept' })
   assert.equal(judgeCalls.length, 0)
   assert.equal(ledger.entries().at(-1)?.skip, 'no-key')
+  // Recorded *and* said: fail-open leaves no other trace of this one.
+  assert.equal(notices.take('agent-1'), 'no-key')
+})
+
+test('a 401 is reported as a session notice, not only as a ledger line', async () => {
+  // The baseUrl failure in one line: a key issued for another System One host
+  // gets a 401 here, and because every capability is fail-open, this notice is
+  // the only place the session can see that nothing is being judged.
+  const cache = createContextCache()
+  cache.remember('agent-1', 'do the thing')
+  const notices = createDegradeNotices()
+  const listener = createPruneListener({
+    settings: () => SETTINGS,
+    credentials: () => KEYED,
+    backendFor: () => ({
+      id: 'fake',
+      judge: async () => { throw new JevError('unauthorized', 'HTTP 401') },
+    }),
+    pruner: () => undefined,
+    cache,
+    budget: createBudget(3, 200),
+    memo: createMemo(),
+    ledger: createMemoryLedger(),
+    notices,
+    now: () => 1_000,
+    newMessageId: () => 'n',
+  })
+  await listener(EXEC, { isError: false, content: [{ type: 'text', text: payload(30) }] }, accept)
+  assert.equal(notices.take('agent-1'), 'unauthorized')
 })
 
 test('without a known task relevance is undecidable, so nothing is sent', async () => {
@@ -392,6 +425,7 @@ test('a backend failure degrades to the original payload', async () => {
     budget: createBudget(3, 200),
     memo: createMemo(),
     ledger: createMemoryLedger(),
+    notices: createDegradeNotices(),
     now: () => 1_000,
     newMessageId: () => 'n',
   })

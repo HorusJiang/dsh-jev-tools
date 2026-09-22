@@ -111,6 +111,8 @@ Editable on the settings page, or in the `config:` block of the bundle row.
 
 Run **`/jev-status`**: it reports whether the plugin is enabled, where the key came from, which endpoint will be called, how many judgments have run, where the ledger lives, and the reason for **every** skip (`task-too-vague`, `too-small`, `budget-turn`, `no-saving`, `unauthorized`).
 
+If the key is missing, or the endpoint is wrong and every call comes back 401, the plugin says so **once in the session** (once per session, per reason). Fail-open means those two failures are reported nowhere else — the session is the only place they are visible, and the notice reaches the **model** as well as you.
+
 | Shown | Meaning |
 |---|---|
 | `API key: not configured` | Configure it one of the three ways above |
@@ -138,6 +140,8 @@ That is also why the ledger **cannot report accuracy** — a `Noul` answer carri
 
 The ledger persists under `$DSH_HOME/storages/dsh_jev_tools/` when the profile has storage, so cumulative numbers survive a restart; memory and disk each keep the latest 1000 records, while the cumulative counters live in their own single row. Writes are best-effort — a failure increments a counter and never throws.
 
+One of those counters is **spend**: input is billed at `$0.042` per million tokens and output is free, so cumulative input tokens *is* the cost, and both `/jev-status` and `npm run measure -- --ledger` show it in dollars. The ledger still cannot report accuracy — for the reason above.
+
 ```bash
 npm run measure -- --ledger      # read the local ledger: savings, skip reasons, latency, cost, answering version
 npm run measure                  # the 8 built-in smoke samples
@@ -152,7 +156,8 @@ The plugin follows your language in both directions with no configuration: the s
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 197 tests (node --test, no test framework)
+npm test                         # builds first, then runs 216 tests (node --test, no test framework)
+node scripts/check-tarball.mjs   # asserts the published tarball carries no local state and nothing is missing
 npm run trigger-rate             # trigger rates from local session logs — no key, no network
 npm run measure -- --ledger      # read the local ledger; reports net savings over DSH's own truncation
 ```
@@ -162,6 +167,8 @@ npm run measure -- --ledger      # read the local ledger; reports net savings ov
 - [docs/dev-workflow.md](docs/dev-workflow.md) — traps hit while developing a local bundle
 
 After changing `lib/` you **must restart `dsh web`**: toggling the plugin off and on does not re-import ESM modules.
+
+Pushing to `main` runs CI (ubuntu + windows × node 24: `npm ci` → `npm test` → tarball check). Releases are driven by a tag: pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against the version in `package.json`, runs the same gates, and publishes through npm trusted publishing (no long-lived token; the trusted publisher has to be configured once on npm — the steps are in the workflow's header comment).
 
 ## License
 

@@ -34,6 +34,7 @@ import { JevError } from '../backends/jev.js'
 import { MAX_STATE_PLUS_QUESTION } from '../request.js'
 import { estimateTokens } from '../tokens.js'
 import { reasonFromFailure, type SkipReason } from '../degrade.js'
+import type { DegradeNotices } from '../notify.js'
 import { detectLang, t, type Lang } from '../i18n.js'
 import {
   INJECTION_ID, injectionNotice, injectionQuestion, planScreening, readInjection,
@@ -84,6 +85,14 @@ export interface PruneDeps {
   readonly budget: Budget
   readonly memo: Memo<readonly unknown[]>
   readonly ledger: Ledger
+  /**
+   * Where a decline that a reader has to know about is reported.
+   *
+   * Fail-open means the two structural failures (`no-key`, `unauthorized`)
+   * leave no other trace, so this is what turns them from invisible into a
+   * single line in the session.
+   */
+  readonly notices: DegradeNotices
   readonly now: () => number
   readonly newMessageId: () => string
 }
@@ -379,6 +388,9 @@ export function createPruneListener (deps: PruneDeps): PostToolListener {
       extra: Partial<{ originalTokens: number }> = {},
       feature: LedgerFeature = 'prune'
     ): PostToolDecision => {
+      // Reported before the record: a structural failure is worth a session
+      // notice even if the ledger switch is off and this writes nothing.
+      deps.notices.note(exec.agent?.id ?? '', reason)
       deps.ledger.record({
         ts: deps.now(),
         agentId: exec.agent?.id ?? '',

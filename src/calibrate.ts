@@ -226,3 +226,103 @@ export function expectedCalibrationError (samples: readonly Sample[]): number {
   }
   return total
 }
+
+/**
+ * Area under the ROC curve, by rank.
+ *
+ * This is the Mann–Whitney U statistic, and it answers the one question a
+ * calibration error cannot: **can this model tell the two classes apart at
+ * all?** A perfectly calibrated but useless model scores 0.5 here, and a
+ * saturated-but-informative one can score high while its ECE is terrible.
+ *
+ * Ties are given their average rank, so a model that answers a constant gets
+ * 0.5 rather than a number that depends on the input order.
+ *
+ * @param samples - the labelled observations.
+ * @returns AUC in [0, 1], or 0.5 when one class is absent — nothing can be
+ *   ranked, and 0.5 is the value that says so instead of implying a skill.
+ */
+export function auc (samples: readonly Sample[]): number {
+  const positives = samples.filter(sample => sample.y === 1).length
+  const negatives = samples.length - positives
+  if (positives === 0 || negatives === 0) return 0.5
+
+  const sorted = [...samples].sort((left, right) => left.p - right.p)
+  let rankSum = 0
+  let index = 0
+  while (index < sorted.length) {
+    // One tie group: every equal score shares the group's average rank.
+    let last = index
+    while (last + 1 < sorted.length && sorted[last + 1]!.p === sorted[index]!.p) last += 1
+    const averageRank = (index + last) / 2 + 1
+    for (let at = index; at <= last; at += 1) {
+      if (sorted[at]!.y === 1) rankSum += averageRank
+    }
+    index = last + 1
+  }
+  return (rankSum - (positives * (positives + 1)) / 2) / (positives * negatives)
+}
+
+/** One operating point: what a threshold does to a labelled set. */
+export interface OperatingPoint {
+  readonly threshold: number
+  /** Of the samples called positive, the share that are. */
+  readonly precision: number
+  /** Of the truly positive samples, the share that were called. */
+  readonly recall: number
+  readonly f1: number
+  /** How many samples this threshold calls positive. */
+  readonly predicted: number
+  readonly truePositives: number
+}
+
+/**
+ * Score every threshold in a sweep.
+ *
+ * This is the step between "the model is calibrated" and "here is the cut-off
+ * to use": pruning only ranks and needs no threshold, but a gate does, and the
+ * sweep is what turns the choice into a measurement rather than a preference.
+ *
+ * @param samples - the labelled observations.
+ * @param steps - how many thresholds to try, spread strictly inside (0, 1).
+ * @returns one point per threshold, ascending.
+ */
+export function sweepThresholds (samples: readonly Sample[], steps = 19): OperatingPoint[] {
+  const points: OperatingPoint[] = []
+  for (let step = 1; step <= steps; step += 1) {
+    const threshold = step / (steps + 1)
+    let truePositives = 0
+    let falsePositives = 0
+    let falseNegatives = 0
+    for (const sample of samples) {
+      const called = sample.p >= threshold
+      if (called && sample.y === 1) truePositives += 1
+      else if (called) falsePositives += 1
+      else if (sample.y === 1) falseNegatives += 1
+    }
+    const predicted = truePositives + falsePositives
+    const precision = predicted === 0 ? 0 : truePositives / predicted
+    const actualPositives = truePositives + falseNegatives
+    const recall = actualPositives === 0 ? 0 : truePositives / actualPositives
+    const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall)
+    points.push({ threshold, precision, recall, f1, predicted, truePositives })
+  }
+  return points
+}
+
+/**
+ * The sweep's best F1.
+ *
+ * A tie goes to the **higher** threshold: at the same F1 the stricter cut-off
+ * spends less of the reader's attention on the cases that do not need it.
+ *
+ * @param points - a sweep, ascending in threshold.
+ * @returns the chosen point, or `undefined` for an empty sweep.
+ */
+export function bestOperatingPoint (points: readonly OperatingPoint[]): OperatingPoint | undefined {
+  let best: OperatingPoint | undefined
+  for (const point of points) {
+    if (best === undefined || point.f1 >= best.f1 - 1e-12) best = point
+  }
+  return best
+}

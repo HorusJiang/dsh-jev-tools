@@ -13,6 +13,7 @@
 import { resolveApiKey } from './credentials.js'
 import { detectLang, t, type Lang } from './i18n.js'
 import { TYPESAFE_KEYS_URL, type JevSettings } from './config.js'
+import { estimateCostUsd, USD_PER_MTOK } from './request.js'
 import type { ContextCache } from './context-cache.js'
 import type { Budget } from './budget.js'
 import type { Ledger } from './ledger.js'
@@ -107,6 +108,16 @@ export async function buildStatus (deps: StatusDeps, agentId?: string): Promise<
   }))
   if (summary.retained < summary.records) {
     lines.push(t(lang, 'status.ledger.retained', { retained: summary.retained }))
+  }
+  // What it has cost, next to what it has saved. The cumulative counter is the
+  // only place this number survives a restart, which is the same reason the
+  // saved-token counters are stored separately from the records.
+  if (summary.spentTokens > 0) {
+    lines.push(t(lang, 'status.cost', {
+      usd: estimateCostUsd(summary.spentTokens).toFixed(6),
+      tokens: summary.spentTokens,
+      price: USD_PER_MTOK,
+    }))
   }
   // Where the records live is a question the user cannot answer from outside,
   // and it decides whether the numbers above survive the next restart.

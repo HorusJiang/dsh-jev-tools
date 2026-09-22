@@ -21,6 +21,7 @@ import { createContextCache, textOfContent } from './context-cache.js'
 import { createGatedLedger, createLazyLedger } from './ledger.js'
 import { createDomainLedger, ledgerDomainSpec } from './ledger-domain.js'
 import { createMemo } from './memo.js'
+import { createDegradeNotices, createDegradeNoticeListener } from './notify.js'
 import { createJevBackend } from './backends/jev.js'
 import type { DecisionBackend } from './backends/types.js'
 import { createPruneListener } from './features/prune.js'
@@ -74,6 +75,11 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
   const cache = createContextCache()
   const budget = createBudget(current.prune.perTurnLimit, current.sessionCallLimit)
   const memo = createMemo<readonly unknown[]>(256)
+
+  // Where a capability that cannot judge at all — no key, or a key the endpoint
+  // refuses — leaves a mark the session can see. Fail-open hides those two
+  // otherwise, and "the plugin does nothing" is the report that follows.
+  const notices = createDegradeNotices()
 
   // The ledger starts in memory and is upgraded to the storage domain as soon
   // as that domain opens. Every caller holds this one stable handle, so the
@@ -157,7 +163,19 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
     budget,
     memo,
     ledger,
+    notices,
     now: () => Date.now(),
+    newMessageId: () => `jev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+  }))
+
+  // Registered before the suggestion listener on purpose: each listener appends
+  // to the messages its continuation returned, so the first one registered ends
+  // up last. A broken plugin's warning belongs after a suggestion, where it is
+  // the final thing the step says.
+  ctx.on('agent/pre-step', createDegradeNoticeListener({
+    notices,
+    settings: () => current ?? resolveSettings(entry),
+    cache,
     newMessageId: () => `jev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
   }))
 
@@ -171,6 +189,7 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
     cache,
     budget,
     ledger,
+    notices,
     now: () => Date.now(),
     newMessageId: () => `jev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
     log: message => { ctx.logger?.warn(`[dsh-jev-tools] ${message}`) },

@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.7` | 2026-09-22 | **unreleased** | Structural failures are no longer silent; cost is visible; calibration gains AUC and a threshold sweep; CI and tag-driven releases. |
 | `0.1.6` | 2026-09-22 | **published** | The judgment endpoint is configurable (`baseUrl`); `/jev-status` reports it. |
 | `0.1.5` | 2026-09-21 | **published** | Fixes the Workshop manifest's adapter field; the capabilities are the same as `0.1.4`. |
 | `0.1.4` | 2026-09-21 | **published** | Adds the OMDSH Workshop manifest; the capabilities are the same as `0.1.3`. |
@@ -20,6 +21,38 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.7] — 2026-09-22
+
+### Added
+
+- **Structural failures are no longer silent.** With no key configured, or a key the endpoint refuses
+  (401), the plugin says so **once in the session** — once per session, per reason, de-duplicated
+  through the session history. Fail-open is the right rule (a failed judgment must not fail the task),
+  and its price is that neither failure is reported anywhere else: a mistyped `baseUrl` or a key issued
+  for a different host looks exactly like a plugin doing nothing. The notice reaches the model as well
+  as the reader, so a model stops trusting a pruning layer that has gone blind.
+- **Spend is visible.** The ledger gains a cumulative input-token counter (input is billed, output is
+  free), and both `/jev-status` and `npm run measure -- --ledger` show it in dollars at `$0.042` per
+  million. Until now `estimateCostUsd()` had no caller outside its unit test, and the measurement script
+  carried its own second copy of the price.
+- **The calibration report gains AUC and a threshold sweep.** `npm run measure -- samples.jsonl` now
+  answers two questions it did not before: ROC AUC (can the model separate the classes at all — a
+  different question from whether it is calibrated) and a 0.05–0.95 threshold table with
+  precision/recall/F1 and the best operating point. That is the number a gate needs, and it complements
+  the existing ECE/Brier.
+- **CI and release automation.** `.github/workflows/ci.yml` (ubuntu + windows × node 24: `npm ci` →
+  `npm test` → tarball check) and `.github/workflows/release.yml` (a **tag is the only thing that
+  publishes**: the tag is checked against the version in `package.json`, the same gates run, and the
+  publish goes through npm trusted publishing with no long-lived token). Together with
+  `scripts/check-tarball.mjs`, which asserts the published tarball carries no local state
+  (`.npm-cache/`, `trigger-rate.json`, …) and is not missing anything a consumer needs — an allowlist is
+  a control only for as long as nobody widens it.
+
+### Changed
+
+- The judgment price is declared once (`USD_PER_MTOK` in `src/request.ts`); the measurement script no
+  longer keeps its own copy.
 
 ## [0.1.6] — 2026-09-22
 

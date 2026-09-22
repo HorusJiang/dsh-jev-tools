@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
-  apply, expectedCalibrationError, fit, fitIsotonic, fitPlatt,
+  apply, auc, bestOperatingPoint, expectedCalibrationError, fit, fitIsotonic, fitPlatt, sweepThresholds,
 } from '../lib/calibrate.js'
 import type { Sample } from '../lib/calibrate.js'
 
@@ -106,4 +106,61 @@ test('reported calibration error reflects the actual over-confidence', () => {
   // A perfectly confident-and-correct set scores near zero.
   assert.ok(expectedCalibrationError([{ p: 1, y: 1 }, { p: 1, y: 1 }]) < 1e-9)
   assert.equal(expectedCalibrationError([]), 0)
+})
+
+test('AUC reports whether the scores rank at all, separately from calibration', () => {
+  // A constant score is all ties: no ranking information, so 0.5 exactly.
+  assert.equal(auc([{ p: 0.5, y: 1 }, { p: 0.5, y: 0 }, { p: 0.5, y: 1 }]), 0.5)
+  // Every positive above every negative.
+  assert.equal(auc([{ p: 0.1, y: 0 }, { p: 0.2, y: 0 }, { p: 0.9, y: 1 }, { p: 0.8, y: 1 }]), 1)
+  // Inverted scores are reported as inverted, not silently folded to 0.5.
+  assert.equal(auc([{ p: 0.9, y: 0 }, { p: 0.1, y: 1 }]), 0)
+})
+
+test('one class alone cannot be ranked, and says so instead of inventing skill', () => {
+  assert.equal(auc([{ p: 0.9, y: 1 }, { p: 0.1, y: 1 }]), 0.5)
+  assert.equal(auc([]), 0.5)
+})
+
+/** Two separated clusters: eight positives high, eight negatives low. */
+function separated (): Sample[] {
+  const samples: Sample[] = []
+  for (let i = 0; i < 8; i += 1) samples.push({ p: 0.8 + i * 0.01, y: 1 })
+  for (let i = 0; i < 8; i += 1) samples.push({ p: 0.1 + i * 0.01, y: 0 })
+  return samples
+}
+
+test('the sweep finds the threshold a gate would actually use', () => {
+  const points = sweepThresholds(separated())
+  assert.equal(points.length, 19)
+  // Ascending, and strictly inside (0, 1) so no threshold is degenerate.
+  for (let i = 1; i < points.length; i += 1) assert.ok(points[i]!.threshold > points[i - 1]!.threshold)
+  assert.ok(points.every(point => point.threshold > 0 && point.threshold < 1))
+
+  const best = bestOperatingPoint(points)
+  assert.ok(best !== undefined)
+  assert.equal(best.f1, 1)
+  assert.equal(best.precision, 1)
+  assert.equal(best.recall, 1)
+  assert.equal(best.predicted, 8, 'all eight positives, and none of the negatives')
+  // 0.80 is the highest cut-off that still calls every positive, and the tie
+  // break prefers it over the lower thresholds that score the same F1.
+  assert.equal(best.threshold, 0.8)
+})
+
+test('a tie on F1 goes to the stricter threshold', () => {
+  // Every cut-off between the clusters scores a perfect F1; the chosen one is
+  // the highest, because the same F1 with less attention spent is the better gate.
+  const points = sweepThresholds(separated())
+  const best = bestOperatingPoint(points)!
+  const tied = points.filter(point => Math.abs(point.f1 - best.f1) < 1e-12)
+  assert.ok(tied.length > 1, 'this set is meant to tie at several thresholds')
+  assert.equal(best.threshold, tied.at(-1)!.threshold)
+})
+
+test('an empty sample set yields no threshold to choose', () => {
+  assert.equal(bestOperatingPoint([]), undefined)
+  const points = sweepThresholds([])
+  assert.equal(points.length, 19)
+  for (const point of points) assert.equal(point.f1, 0)
 })

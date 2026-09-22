@@ -52,6 +52,7 @@ const LAYERS: Record<string, number> = {
   // vocabulary. These depend on foundation modules only.
   credentials: 1,
   degrade: 1,
+  notify: 1,
   request: 1,
   'settings-ns': 1,
   'features/screen': 1,

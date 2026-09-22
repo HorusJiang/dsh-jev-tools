@@ -1,0 +1,75 @@
+name: release
+
+# A tag is the only thing that publishes. There is deliberately no
+# `workflow_dispatch`: `npm publish` ships whatever package.json says, so a
+# manual trigger is a path to publishing a version nobody tagged, and the
+# version check below closes that by construction rather than by remembering.
+#
+# ## One-time setup, on the npm side
+#
+# This uses npm's trusted publishing: GitHub hands npm a short-lived OIDC token
+# and npm attaches provenance automatically, so there is no long-lived
+# NPM_TOKEN secret to leak or rotate. It must be enabled once per package:
+#
+#   npmjs.com -> the package -> Settings -> Trusted Publisher -> GitHub Actions
+#     organization or user : HorusJiang
+#     repository           : dsh-jev-tools
+#     workflow filename    : release.yml
+#     environment          : (leave empty)
+#
+# Until that is configured, the publish step fails with a 403 naming the missing
+# trusted publisher. Publishing by hand still works meanwhile — this workflow
+# replaces that habit, it does not block it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # the OIDC token npm exchanges for a one-shot publish grant
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false # never cache in a release build
+
+      # The runner's bundled npm may predate trusted publishing (needs >= 11.5.1).
+      - name: Ensure npm supports trusted publishing
+        run: npm install --global npm@latest
+
+      # The tag and the manifest must agree before anything is uploaded, because
+      # the publish itself takes the version from package.json and ignores the tag.
+      - name: The tag and the manifest must agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag = ${GITHUB_REF_NAME}, package.json = ${pkg}"
+          if [ "${tag}" != "${pkg}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${pkg}"
+            exit 1
+          fi
+
+      - name: Install
+        run: npm ci
+
+      # The same gates CI runs on main, so only something those gates already
+      # passed can ship.
+      - name: Build and test
+        run: npm test
+
+      - name: The tarball carries nothing local
+        run: node scripts/check-tarball.mjs
+
+      # No token and no `--provenance` flag: npm takes the OIDC identity for the
+      # publish grant and attaches provenance itself for a public package.
+      - name: Publish to npm
+        run: npm publish

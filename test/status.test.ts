@@ -182,3 +182,24 @@ test('the endpoint in force is named, because a wrong one looks like doing nothi
   const plain = await buildStatus(deps(), 'agent-1')
   assert.match(plain, /Judgment endpoint: https:\/\/api\.typesafe\.ai/)
 })
+
+test('what it has cost is reported next to what it has saved', async () => {
+  const report = await buildStatus(deps({
+    ledger: stubLedger(
+      { records: 12, judged: 12, retained: 12, spentTokens: 1_000_000, savedTokens: 40_000 },
+      { kind: 'domain', failures: 0 }
+    ),
+  }), 'agent-1')
+  // 1,000,000 input tokens at $0.042 per million, with the price named so the
+  // number can be checked rather than trusted.
+  assert.match(report, /Judgment cost: about \$0\.042000 \(1000000 input tokens cumulative at \$0\.042 per million/)
+})
+
+test('a plugin that has never judged does not claim a cost', async () => {
+  // Zero is not a measurement worth a line, and the records counter above
+  // already says the same thing without dressing it up as spend.
+  const report = await buildStatus(deps({
+    ledger: stubLedger({ records: 1, retained: 1 }, { kind: 'memory', failures: 0 }),
+  }), 'agent-1')
+  assert.doesNotMatch(report, /Judgment cost/)
+})

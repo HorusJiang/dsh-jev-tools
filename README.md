@@ -111,6 +111,8 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 
 敲 **`/jev-status`**：显示启用状态、key 来源、判定端点、判定次数、台账存放位置，以及每一次跳过的原因（`task-too-vague`、`too-small`、`budget-turn`、`no-saving`、`unauthorized`）。
 
+如果 key 没配好、或端点填错导致 401，插件会**在会话里说一次**（每个会话、每种原因各一次）。fail-open 的意义是判定失败不影响任务，代价是这两类失败在别处都不报错——会话是唯一能看见它们的地方，而这条提示同时到达你**和模型**。
+
 | 显示 | 含义 |
 |---|---|
 | `API key：未配置` | 按上文三种方式之一配置 |
@@ -138,6 +140,8 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 
 台账持久化到 `$DSH_HOME/storages/dsh_jev_tools/`（profile 有 storage 时），重启后累计数字不丢；内存与磁盘各保留最近 1000 条，累计数字单独存一行计数器。写入是 best-effort，失败只累加计数、绝不抛出。
 
+计数器里还有一项**花费**：输入按 `$0.042`/百万 tokens 计费、输出免费，所以累计 input tokens 就是成本，`/jev-status` 与 `npm run measure -- --ledger` 都把它折成美元显示。台账本身给不出准确率——原因见上。
+
 ```bash
 npm run measure -- --ledger      # 读本机台账：增量、跳过原因、延迟、成本、作答版本
 npm run measure                  # 内置 8 条冒烟样本
@@ -152,7 +156,8 @@ npm run measure -- samples.jsonl # 有标注（{p, y}）的数据：准确率、
 
 ```bash
 npm install --cache .npm-cache   # 依赖极少
-npm test                         # 先构建，再跑 197 个测试（node --test，无测试框架依赖）
+npm test                         # 先构建，再跑 216 个测试（node --test，无测试框架依赖）
+node scripts/check-tarball.mjs   # 断言发布包里既没有本机状态、也不缺该有的文件（CI 与发布前都跑）
 npm run trigger-rate             # 从本地会话日志统计触发率，无需 key、无网络
 npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH 自带截断的净增量
 ```
@@ -162,6 +167,8 @@ npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH �
 - [docs/dev-workflow.md](docs/dev-workflow.md) —— 本地 bundle 开发踩过的坑
 
 改了 `lib/` 之后**必须重启 `dsh web`**：关开插件开关不会重新导入 ESM 模块。
+
+推送到 `main` 会自动跑 CI（ubuntu + windows × node 24：`npm ci` → `npm test` → tarball 检查）。发布靠打 tag：推一个 `v*` tag 会走 `.github/workflows/release.yml`——先校验 tag 与 `package.json` 的版本一致，再跑同一套门禁，最后经 npm trusted publishing 发布（无长期 token；首次需在 npm 侧配置一次 trusted publisher，workflow 头部注释里有步骤）。
 
 ## License
 
