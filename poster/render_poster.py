@@ -340,8 +340,8 @@ def draw_content(img: Image.Image) -> None:
     d = ImageDraw.Draw(img)
     d.rounded_rectangle(tuple(u(v) for v in pill), radius=u(18),
                         outline=rgb_of(CYAN) + (128,), width=max(1, u(1)))
-    pw = d.textlength("v0.1.7", font=f_pill) / SCALE
-    draw_at(d, px + (96 - pw) / 2, yb + 12, "v0.1.7", f_pill, "#9FE8F2")
+    pw = d.textlength("v0.1.8", font=f_pill) / SCALE
+    draw_at(d, px + (96 - pw) / 2, yb + 12, "v0.1.8", f_pill, "#9FE8F2")
 
     tx = pill[2] + 20
     d.line([(u(tx), u(yb + 6)), (u(tx), u(yb + 38))], fill=(255, 255, 255, 41), width=max(1, u(1)))
