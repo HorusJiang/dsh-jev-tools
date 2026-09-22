@@ -12,6 +12,15 @@ node_modules/
 *.tsbuildinfo
 .npm-cache/
 
+# Scratch files: anything fetched or generated while investigating something.
+#
+# These belong outside the repository or under `notes/`, but the failure this
+# pattern prevents is specific: `git add -A` sweeps up whatever is lying around,
+# and a research file left in the root then ships in a commit. It happened once
+# — a copy of npm's own staged-publishing documentation was committed this way.
+.tmp*
+
+
 # Local-only working documents.
 #
 # `notes/` holds the author's own material — project plans, drafts, research,
