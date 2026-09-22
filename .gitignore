@@ -1,5 +1,14 @@
 node_modules/
-lib/
+
+# The build output at the repository root, anchored on purpose.
+#
+# A bare `lib/` also matches `scripts/lib/` at any depth, and that is not a
+# hypothetical: it silently kept `scripts/lib/ledger-files.ts` and
+# `scripts/lib/session-log.ts` out of the repository while `test/ledger-files.test.ts`
+# and `npm run trigger-rate` import them. Every local run passed — the files were
+# on the author's disk — and a clean clone could not run its own tests, which is
+# what the first CI run reported.
+/lib/
 *.tsbuildinfo
 .npm-cache/
 
