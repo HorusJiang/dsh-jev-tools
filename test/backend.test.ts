@@ -185,13 +185,13 @@ test('a configured baseUrl replaces the default host, path and all', async () =>
     return json({ model: 'jev-1.13.0', answers: { refund: { type: 'noul', noul: 0.22 } } })
   }) as unknown as typeof fetch
   const deps = { fetchImpl: impl, sleep: recorder().sleep }
-  for (const baseUrl of ['https://api.codiv.ai', 'https://api.codiv.ai/']) {
+  for (const baseUrl of ['https://jev.example.com', 'https://jev.example.com/']) {
     const backend = createJevBackend({ apiKey: 'sk-x', model: 'jev-latest', baseUrl, deps })
     await backend.judge(REQUEST, new AbortController().signal)
   }
   assert.deepEqual(seen, [
-    'https://api.codiv.ai/v1/systemone',
-    'https://api.codiv.ai/v1/systemone',
+    'https://jev.example.com/v1/systemone',
+    'https://jev.example.com/v1/systemone',
   ])
 })
 

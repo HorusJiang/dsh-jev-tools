@@ -89,7 +89,7 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 |---|---|---|
 | `enabled` | `true` | 总开关 |
 | `apiKeyEnv` | `TYPESAFE_API_KEY` | 读取 key 的环境变量名 |
-| `baseUrl` | `https://api.typesafe.ai` | System One 判定端点，填裸主机名。key 属于自建或第三方主机（如 Codiv）时改这里——key 是**按主机签发**的，发到默认主机只会拿到 401。路径 `/v1/systemone` 由插件追加 |
+| `baseUrl` | `https://api.typesafe.ai` | System One 判定端点，填裸主机名。自建的 Jev 兼容服务、或在前面挡了一层网关的部署都要改这里——端点写死会让这些部署的请求发去默认主机。路径 `/v1/systemone` 由插件追加 |
 | `model` | `jev-latest` | 别名会随版本移动；每次判定都记录实际作答版本 |
 | `sessionCallLimit` | `200` | 每会话判定次数上限（所有能力合计） |
 | `prune.enabled` | `true` | 启用工具结果精简 |

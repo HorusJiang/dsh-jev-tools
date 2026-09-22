@@ -25,14 +25,15 @@ Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repos
 
 ### Added
 
-- **The judgment endpoint is configurable** (`baseUrl`, default `https://api.typesafe.ai`). Until now the
-  endpoint was a constant in the source: anyone whose key belongs to a self-hosted or third-party System
-  One host (Codiv, for instance) could not change it, so every request went to `api.typesafe.ai` — and a
-  key is issued **for a host**, so that host answers 401 for another's. Because every capability here is
-  fail-open, the 401 showed up as pruning, screening and suggestion all **silently doing nothing**, with
-  one warning left in the log. The value now travels from the settings (or the bundle row's `config:`)
-  into all three backend construction points; give it a bare host and the plugin still appends
-  `/v1/systemone`. Like the key, the endpoint is read per operation, so a change needs no restart.
+- **The judgment endpoint is configurable** (`baseUrl`, default `https://api.typesafe.ai`). The change is
+  small because it fixes a **declared-but-never-wired** gap: `JevBackendOptions.baseUrl` already existed
+  and `createJevBackend` already read its address from it, but `JevSettings` had no such field, so the
+  settings page offered no way to set one and the three construction points in `apply()` had nothing to
+  pass — the pipeline could only ever reach the default host. A hardcoded endpoint is what blocks
+  **self-hosted Jev-compatible servers** and deployments that put **a gateway in front**. The value now
+  travels from the settings (or the bundle row's `config:`) into all three backend construction points;
+  give it a bare host and the plugin still appends `/v1/systemone`. Like the key, the endpoint is read
+  per operation, so a change needs no restart.
 - **`/jev-status` gains a "Judgment endpoint" line.** With the endpoint configurable, where the content
   goes stops being a constant — and a wrong one looks exactly like a plugin doing nothing. That report is
   the one place built to answer that question.

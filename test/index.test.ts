@@ -85,8 +85,8 @@ async function judgedUrls (entry: unknown): Promise<string[]> {
 
 test('a configured baseUrl reaches the wire, vendor path included', async () => {
   assert.deepEqual(
-    await judgedUrls({ baseUrl: 'https://api.codiv.ai' }),
-    ['https://api.codiv.ai/v1/systemone']
+    await judgedUrls({ baseUrl: 'https://jev.example.com' }),
+    ['https://jev.example.com/v1/systemone']
   )
 })
 

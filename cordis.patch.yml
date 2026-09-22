@@ -13,9 +13,9 @@
 #
 # Privacy: once a key is configured, tool-result and fetched-page content is sent
 # to the configured System One endpoint (api.typesafe.ai unless `baseUrl` names a
-# self-hosted or third-party host) for judging. Every capability can be turned off
-# separately in Settings -> Plugins -> dsh-jev-tools, and disabling takes effect
-# immediately.
+# self-hosted or gateway deployment) for judging. Every capability can be turned
+# off separately in Settings -> Plugins -> dsh-jev-tools, and disabling takes
+# effect immediately.
 - insert:
     - id: jev-tools
       name: dsh-jev-tools

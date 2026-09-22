@@ -83,8 +83,8 @@ test('a key scoped to another System One host can point the plugin at it', () =>
   // The setting exists because a key is issued *for* a host: sent to the default
   // one it earns a 401, and a fail-open plugin would hide that. Overriding the
   // endpoint must also leave every sibling field alone.
-  const s = resolveSettings({ baseUrl: 'https://api.codiv.ai' })
-  assert.equal(s.baseUrl, 'https://api.codiv.ai')
+  const s = resolveSettings({ baseUrl: 'https://jev.example.com' })
+  assert.equal(s.baseUrl, 'https://jev.example.com')
   assert.equal(s.apiKeyEnv, DEFAULT_API_KEY_ENV)
   assert.equal(s.model, 'jev-latest')
 })

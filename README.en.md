@@ -89,7 +89,7 @@ Editable on the settings page, or in the `config:` block of the bundle row.
 |---|---|---|
 | `enabled` | `true` | Master switch |
 | `apiKeyEnv` | `TYPESAFE_API_KEY` | Environment variable the key is read from |
-| `baseUrl` | `https://api.typesafe.ai` | System One API root, a bare host. Change it when your key belongs to a self-hosted or third-party host (Codiv, say) — a key is issued **for a host**, and the default one answers 401 for another's. The plugin appends the `/v1/systemone` path |
+| `baseUrl` | `https://api.typesafe.ai` | System One API root, a bare host. Change it for a self-hosted Jev-compatible server, or for a deployment that puts a gateway in front — a hardcoded endpoint sends those requests to the default host. The plugin appends the `/v1/systemone` path |
 | `model` | `jev-latest` | The alias moves with releases; every judgment records the version that answered |
 | `sessionCallLimit` | `200` | Judgment calls per session, all capabilities combined |
 | `prune.enabled` | `true` | Enable tool-result pruning |

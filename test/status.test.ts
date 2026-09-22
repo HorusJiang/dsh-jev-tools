@@ -175,9 +175,9 @@ test('the endpoint in force is named, because a wrong one looks like doing nothi
   // the report is the only place a user can confirm which host will be asked
   // without reading logs.
   const custom = await buildStatus(deps({
-    settings: () => resolveSettings({ baseUrl: 'https://api.codiv.ai' }),
+    settings: () => resolveSettings({ baseUrl: 'https://jev.example.com' }),
   }), 'agent-1')
-  assert.match(custom, /Judgment endpoint: https:\/\/api\.codiv\.ai/)
+  assert.match(custom, /Judgment endpoint: https:\/\/jev\.example\.com/)
 
   const plain = await buildStatus(deps(), 'agent-1')
   assert.match(plain, /Judgment endpoint: https:\/\/api\.typesafe\.ai/)
