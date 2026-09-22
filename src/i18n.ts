@@ -90,6 +90,7 @@ const CATALOG = {
     en: 'Injection screening: {state} (threshold {threshold}, {minTokens}+ tokens, allowlist {allowlist}) — advisory only, blocks nothing',
   },
   'status.model': { zh: '模型：{model}', en: 'Model: {model}' },
+  'status.endpoint': { zh: '判定端点：{url}', en: 'Judgment endpoint: {url}' },
   'status.shadow': {
     zh: '剪枝处于**试运行**：照常判定与记账，但不改动内容。',
     en: 'Pruning is in **shadow mode**: it judges and records, but changes nothing.',

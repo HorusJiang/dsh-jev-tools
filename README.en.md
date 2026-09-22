@@ -70,7 +70,7 @@ Get a key at <https://console.typesafe.ai/keys>.
 
 **This is the one section worth reading before you enable it.** Writing only what is sent leaves you guessing about the rest, so both columns are here.
 
-| Stays on this machine | Sent to `api.typesafe.ai` |
+| Stays on this machine | Sent to the configured System One endpoint (default `api.typesafe.ai`) |
 |---|---|
 | The API key literal (it appears only as an `Authorization` header — never logged, never echoed) | That key's value, as that header, for the duration of the request only |
 | The judgment ledger under `$DSH_HOME/storages/dsh_jev_tools/` | — |
@@ -79,7 +79,7 @@ Get a key at <https://console.typesafe.ai/keys>.
 | — | Injection screening: the **fetched page body**, plus the current request text |
 | — | Skill suggestion: the current request text, plus skill names and descriptions |
 
-In one line: **once a key is configured, tool output and fetched pages leave the machine.** Every capability can be switched off separately in Settings and takes effect immediately; injection screening is **advisory** — it never blocks a call and never rewrites content.
+In one line: **once a key is configured, tool output and fetched pages leave the machine.** Where they go is `baseUrl` (default `api.typesafe.ai`) — point it at a self-hosted or third-party System One host and the right-hand column follows. Every capability can be switched off separately in Settings and takes effect immediately; injection screening is **advisory** — it never blocks a call and never rewrites content.
 
 ## Settings
 
@@ -89,6 +89,7 @@ Editable on the settings page, or in the `config:` block of the bundle row.
 |---|---|---|
 | `enabled` | `true` | Master switch |
 | `apiKeyEnv` | `TYPESAFE_API_KEY` | Environment variable the key is read from |
+| `baseUrl` | `https://api.typesafe.ai` | System One API root, a bare host. Change it when your key belongs to a self-hosted or third-party host (Codiv, say) — a key is issued **for a host**, and the default one answers 401 for another's. The plugin appends the `/v1/systemone` path |
 | `model` | `jev-latest` | The alias moves with releases; every judgment records the version that answered |
 | `sessionCallLimit` | `200` | Judgment calls per session, all capabilities combined |
 | `prune.enabled` | `true` | Enable tool-result pruning |
@@ -108,7 +109,7 @@ Editable on the settings page, or in the `config:` block of the bundle row.
 
 ## Troubleshooting
 
-Run **`/jev-status`**: it reports whether the plugin is enabled, where the key came from, how many judgments have run, where the ledger lives, and the reason for **every** skip (`task-too-vague`, `too-small`, `budget-turn`, `no-saving`, `unauthorized`).
+Run **`/jev-status`**: it reports whether the plugin is enabled, where the key came from, which endpoint will be called, how many judgments have run, where the ledger lives, and the reason for **every** skip (`task-too-vague`, `too-small`, `budget-turn`, `no-saving`, `unauthorized`).
 
 | Shown | Meaning |
 |---|---|
@@ -151,7 +152,7 @@ The plugin follows your language in both directions with no configuration: the s
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 192 tests (node --test, no test framework)
+npm test                         # builds first, then runs 197 tests (node --test, no test framework)
 npm run trigger-rate             # trigger rates from local session logs — no key, no network
 npm run measure -- --ledger      # read the local ledger; reports net savings over DSH's own truncation
 ```

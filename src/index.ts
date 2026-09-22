@@ -22,6 +22,7 @@ import { createGatedLedger, createLazyLedger } from './ledger.js'
 import { createDomainLedger, ledgerDomainSpec } from './ledger-domain.js'
 import { createMemo } from './memo.js'
 import { createJevBackend } from './backends/jev.js'
+import type { DecisionBackend } from './backends/types.js'
 import { createPruneListener } from './features/prune.js'
 import { createSkillSuggestListener } from './features/skill-suggest.js'
 import { installSettingsNamespace } from './settings-ns.js'
@@ -97,6 +98,18 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
   ctx.inject(['toolResultPruner'], scope => { pruner = scope.toolResultPruner })
   ctx.inject(['skills'], scope => { skills = scope.skills })
 
+  /**
+   * Build a backend for one operation.
+   *
+   * The endpoint travels with the key, and both are re-read per operation for
+   * the same reason: a settings change has to reach the next judgment without a
+   * restart. A key issued by a self-hosted or third-party System One host earns
+   * a 401 against the default host, and because every capability here is
+   * fail-open, that 401 would look like a plugin doing nothing.
+   */
+  const backendFor = (apiKey: string, model: string): DecisionBackend =>
+    createJevBackend({ apiKey, model, baseUrl: (current ?? resolveSettings(entry)).baseUrl })
+
   ctx.inject(['storageDomain'], (scope: ServiceScope) => {
     const facility = scope.storageDomain
     if (facility === undefined) return
@@ -138,7 +151,7 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
   ctx.on('tools/post-execute', createPruneListener({
     settings: () => current ?? resolveSettings(entry),
     credentials: () => credentials,
-    backendFor: (apiKey, model) => createJevBackend({ apiKey, model }),
+    backendFor,
     pruner: () => pruner,
     cache,
     budget,
@@ -153,7 +166,7 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
   ctx.on('agent/pre-step', createSkillSuggestListener({
     settings: () => current ?? resolveSettings(entry),
     credentials: () => credentials,
-    backendFor: (apiKey, model) => createJevBackend({ apiKey, model }),
+    backendFor,
     skills: () => skills,
     cache,
     budget,
@@ -172,7 +185,7 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
     const shared = {
       settings: () => current ?? resolveSettings(entry),
       credentials: () => credentials,
-      backendFor: (apiKey: string, model: string) => createJevBackend({ apiKey, model }),
+      backendFor,
       cache,
       budget,
       ledger,

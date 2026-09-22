@@ -13,11 +13,18 @@
  */
 
 import { postJson, type HttpDeps, type HttpProblem } from '../http.js'
+import { DEFAULT_BASE_URL } from '../config.js'
 import { SYSTEM_ONE_PATH, buildBody, validateRequest, type Violation } from '../request.js'
 import type { Answer, DecisionBackend, JudgmentRequest, JudgmentResult } from './types.js'
 
-/** Default API root. */
-export const DEFAULT_BASE_URL = 'https://api.typesafe.ai'
+/**
+ * Default API root.
+ *
+ * Declared in `config.ts` so the setting's default and this backend's fallback
+ * cannot drift into two different hosts; re-exported here because this module is
+ * where a caller reads the backend's contract.
+ */
+export { DEFAULT_BASE_URL }
 
 /** Default per-request timeout, in milliseconds. */
 export const DEFAULT_TIMEOUT_MS = 10_000
@@ -47,6 +54,7 @@ export interface JevBackendOptions {
   readonly apiKey: string
   /** Model id or alias. */
   readonly model: string
+  /** System One API root, a bare host. Defaults to the vendor's own. */
   readonly baseUrl?: string
   readonly timeoutMs?: number
   /** Injectable transport, for tests. */

@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.6` | 2026-09-22 | **published** | The judgment endpoint is configurable (`baseUrl`); `/jev-status` reports it. |
 | `0.1.5` | 2026-09-21 | **published** | Fixes the Workshop manifest's adapter field; the capabilities are the same as `0.1.4`. |
 | `0.1.4` | 2026-09-21 | **published** | Adds the OMDSH Workshop manifest; the capabilities are the same as `0.1.3`. |
 | `0.1.3` | 2026-09-21 | **published** | README rewrite; the capabilities are the same as `0.1.2`. |
@@ -19,6 +20,28 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.6] — 2026-09-22
+
+### Added
+
+- **The judgment endpoint is configurable** (`baseUrl`, default `https://api.typesafe.ai`). Until now the
+  endpoint was a constant in the source: anyone whose key belongs to a self-hosted or third-party System
+  One host (Codiv, for instance) could not change it, so every request went to `api.typesafe.ai` — and a
+  key is issued **for a host**, so that host answers 401 for another's. Because every capability here is
+  fail-open, the 401 showed up as pruning, screening and suggestion all **silently doing nothing**, with
+  one warning left in the log. The value now travels from the settings (or the bundle row's `config:`)
+  into all three backend construction points; give it a bare host and the plugin still appends
+  `/v1/systemone`. Like the key, the endpoint is read per operation, so a change needs no restart.
+- **`/jev-status` gains a "Judgment endpoint" line.** With the endpoint configurable, where the content
+  goes stops being a constant — and a wrong one looks exactly like a plugin doing nothing. That report is
+  the one place built to answer that question.
+
+### Changed
+
+- The default endpoint is now declared in exactly one place (`src/config.ts`) and imported by the
+  backend instead of being held twice, so the setting's default and the backend's fallback cannot drift
+  into two different hosts.
 
 ## [0.1.5] — 2026-09-21
 
@@ -108,8 +131,8 @@ Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repos
 - **Measurement tooling**: `scripts/trigger-rate.ts` (trigger rate from local
   session logs; no key, no network) and `scripts/measure.ts` (labelled-set
   calibration, or the ledger's own increment report).
-- **192 tests**, covering the pruning pipeline and every skip guard, the
-  retry/backoff matrix, request validation, credentials policy, ledger
+- **Test coverage at every seam**: the pruning pipeline and every skip guard,
+  the retry/backoff matrix, request validation, credentials policy, ledger
   persistence and restart continuity, screening, the gate's decision matrix, and
   the architectural layering (which is enforced by a test rather than by
   convention).

@@ -70,7 +70,7 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 
 **这是启用前唯一必须读的一节。** 只写「发了什么」会让人自己猜剩下的部分，所以两边都写。
 
-| 留在本机 | 发往 `api.typesafe.ai` |
+| 留在本机 | 发往配置的 System One 端点（默认 `api.typesafe.ai`） |
 |---|---|
 | API key 的字面量（只作为 `Authorization` 头出现，不进日志、不回显） | 该 key 的值，作为那个头，仅在该请求期间 |
 | `$DSH_HOME/storages/dsh_jev_tools/` 下的判定台账 | — |
@@ -79,7 +79,7 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 | — | 注入筛查：**抓取到的页面正文**，以及当前任务文本 |
 | — | 技能推荐：当前任务文本，以及技能目录的名称与描述 |
 
-一句话：**启用后，工具输出与抓取到的页面会离开本机。** 每项能力都可在设置页分别关闭，关闭立即生效；注入筛查**只提醒**，绝不拦截调用、绝不改写内容。
+一句话：**启用后，工具输出与抓取到的页面会离开本机。** 目的地由 `baseUrl` 决定（默认 `api.typesafe.ai`）——把它指向自建或第三方 System One 主机，右边一列的目的地就随之改变。每项能力都可在设置页分别关闭，关闭立即生效；注入筛查**只提醒**，绝不拦截调用、绝不改写内容。
 
 ## 设置项
 
@@ -89,6 +89,7 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 |---|---|---|
 | `enabled` | `true` | 总开关 |
 | `apiKeyEnv` | `TYPESAFE_API_KEY` | 读取 key 的环境变量名 |
+| `baseUrl` | `https://api.typesafe.ai` | System One 判定端点，填裸主机名。key 属于自建或第三方主机（如 Codiv）时改这里——key 是**按主机签发**的，发到默认主机只会拿到 401。路径 `/v1/systemone` 由插件追加 |
 | `model` | `jev-latest` | 别名会随版本移动；每次判定都记录实际作答版本 |
 | `sessionCallLimit` | `200` | 每会话判定次数上限（所有能力合计） |
 | `prune.enabled` | `true` | 启用工具结果精简 |
@@ -108,7 +109,7 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 
 ## 排查
 
-敲 **`/jev-status`**：显示启用状态、key 来源、判定次数、台账存放位置，以及每一次跳过的原因（`task-too-vague`、`too-small`、`budget-turn`、`no-saving`、`unauthorized`）。
+敲 **`/jev-status`**：显示启用状态、key 来源、判定端点、判定次数、台账存放位置，以及每一次跳过的原因（`task-too-vague`、`too-small`、`budget-turn`、`no-saving`、`unauthorized`）。
 
 | 显示 | 含义 |
 |---|---|
@@ -151,7 +152,7 @@ npm run measure -- samples.jsonl # 有标注（{p, y}）的数据：准确率、
 
 ```bash
 npm install --cache .npm-cache   # 依赖极少
-npm test                         # 先构建，再跑 192 个测试（node --test，无测试框架依赖）
+npm test                         # 先构建，再跑 197 个测试（node --test，无测试框架依赖）
 npm run trigger-rate             # 从本地会话日志统计触发率，无需 key、无网络
 npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH 自带截断的净增量
 ```

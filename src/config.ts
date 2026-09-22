@@ -17,6 +17,19 @@ export const JEV_TOOLS_NS = 'dsh-jev-tools'
 export const TYPESAFE_KEYS_URL = 'https://console.typesafe.ai/keys'
 
 /**
+ * Default System One API root, as a bare host.
+ *
+ * The path (`/v1/systemone`) is appended by the backend, so this must not carry
+ * one. A key issued by a self-hosted or third-party System One host — one such
+ * host is Codiv — is scoped to *that* host: pointed at the default one it earns
+ * a 401, and since every capability here is fail-open, that 401 looks exactly
+ * like a plugin doing nothing. Hence `baseUrl` is a setting rather than a
+ * constant, and hence the default is declared once, here, where the settings
+ * schema can use it as the default for the setting itself.
+ */
+export const DEFAULT_BASE_URL = 'https://api.typesafe.ai'
+
+/**
  * Default credential reference.
  *
  * Deliberately the same environment variable the official TypeSafe SDK reads,
@@ -51,6 +64,8 @@ export interface JevSettings {
   enabled: boolean
   /** Environment-variable name the key is resolved from, re-resolved on every operation. */
   apiKeyEnv: string
+  /** System One API root, a bare host. The vendor's own path is appended to it. */
+  baseUrl: string
   /** Jev model id, an alias or a pinned version. The response's own `model` is what gets recorded. */
   model: string
   /** Hard ceiling on judgments per session, across every capability. */
@@ -113,6 +128,9 @@ export const Config = Schema.object({
   apiKeyEnv: Schema.string()
     .default(DEFAULT_API_KEY_ENV)
     .description(`读取 API key 的环境变量名。默认 ${DEFAULT_API_KEY_ENV}（与 TypeSafe 官方 SDK 相同，已在使用官方工具链的人无需配置）。密钥本身永远不会出现在任何响应里。`),
+  baseUrl: Schema.string()
+    .default(DEFAULT_BASE_URL)
+    .description(`System One 判定端点，填裸主机名。默认 ${DEFAULT_BASE_URL}；key 属于自建或第三方 System One 主机（例如 https://api.codiv.ai）时改这里——默认主机对别处的 key 只会返回 401，而本插件是 fail-open 的，那看起来就像什么都没发生。路径 /v1/systemone 由插件追加，不要写进这里。`),
   model: Schema.string()
     .default('jev-latest')
     .description('使用的 Jev 模型。别名会随版本移动——每次判定都会记录响应里回报的实际作答版本。'),

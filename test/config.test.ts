@@ -14,6 +14,7 @@ import { test } from 'node:test'
 import {
   Config,
   DEFAULT_API_KEY_ENV,
+  DEFAULT_BASE_URL,
   DEFAULT_TOOL_ALLOWLIST,
   JEV_TOOLS_NS,
   resolveSettings,
@@ -30,6 +31,9 @@ test('defaults match the S0 measurements', () => {
   assert.equal(s.apiKeyEnv, DEFAULT_API_KEY_ENV)
   // Same variable the official TypeSafe SDK reads: existing Jev users need no setup.
   assert.equal(s.apiKeyEnv, 'TYPESAFE_API_KEY')
+  // A bare host: the backend appends the vendor's own path to it.
+  assert.equal(s.baseUrl, DEFAULT_BASE_URL)
+  assert.equal(s.baseUrl, 'https://api.typesafe.ai')
   assert.equal(s.model, 'jev-latest')
   assert.equal(s.sessionCallLimit, 200)
 
@@ -73,4 +77,14 @@ test('the schema is usable as a configuration-surface declaration', () => {
   assert.equal(typeof Config, 'function')
   const resolved = Config({}) as { prune: { enabled: boolean } }
   assert.equal(resolved.prune.enabled, true)
+})
+
+test('a key scoped to another System One host can point the plugin at it', () => {
+  // The setting exists because a key is issued *for* a host: sent to the default
+  // one it earns a 401, and a fail-open plugin would hide that. Overriding the
+  // endpoint must also leave every sibling field alone.
+  const s = resolveSettings({ baseUrl: 'https://api.codiv.ai' })
+  assert.equal(s.baseUrl, 'https://api.codiv.ai')
+  assert.equal(s.apiKeyEnv, DEFAULT_API_KEY_ENV)
+  assert.equal(s.model, 'jev-latest')
 })

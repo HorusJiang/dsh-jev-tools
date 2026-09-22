@@ -175,6 +175,26 @@ test('a response without a model version is malformed', async () => {
     (error: unknown) => error instanceof JevError && error.problem === 'malformed-response')
 })
 
+test('a configured baseUrl replaces the default host, path and all', async () => {
+  // The vendor path is appended to whatever host is configured, and a trailing
+  // slash must not become a doubled one. Both of these are the setting's whole
+  // contract with the wire.
+  const seen: string[] = []
+  const impl = (async (url: string) => {
+    seen.push(url)
+    return json({ model: 'jev-1.13.0', answers: { refund: { type: 'noul', noul: 0.22 } } })
+  }) as unknown as typeof fetch
+  const deps = { fetchImpl: impl, sleep: recorder().sleep }
+  for (const baseUrl of ['https://api.codiv.ai', 'https://api.codiv.ai/']) {
+    const backend = createJevBackend({ apiKey: 'sk-x', model: 'jev-latest', baseUrl, deps })
+    await backend.judge(REQUEST, new AbortController().signal)
+  }
+  assert.deepEqual(seen, [
+    'https://api.codiv.ai/v1/systemone',
+    'https://api.codiv.ai/v1/systemone',
+  ])
+})
+
 test('a Noul answer carries no confidence, by the vendor\u2019s own contract', () => {
   const answer = classifyAnswer({ type: 'noul', noul: 0.22, confidence: 0.97 })
   assert.deepEqual(answer, { type: 'noul', noul: 0.22 })

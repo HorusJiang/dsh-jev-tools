@@ -169,3 +169,16 @@ test('an unknown key is reported with where to get one', async () => {
   // worth naming: "nothing happens" and "no key can ever be read" differ.
   assert.match(report, /credentials service is unavailable/)
 })
+
+test('the endpoint in force is named, because a wrong one looks like doing nothing', async () => {
+  // Once `baseUrl` is configurable the destination stops being a constant, and
+  // the report is the only place a user can confirm which host will be asked
+  // without reading logs.
+  const custom = await buildStatus(deps({
+    settings: () => resolveSettings({ baseUrl: 'https://api.codiv.ai' }),
+  }), 'agent-1')
+  assert.match(custom, /Judgment endpoint: https:\/\/api\.codiv\.ai/)
+
+  const plain = await buildStatus(deps(), 'agent-1')
+  assert.match(plain, /Judgment endpoint: https:\/\/api\.typesafe\.ai/)
+})

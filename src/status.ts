@@ -69,6 +69,10 @@ export async function buildStatus (deps: StatusDeps, agentId?: string): Promise<
   }))
   if (settings.prune.shadow) lines.push(t(lang, 'status.shadow'))
   lines.push(t(lang, 'status.model', { model: settings.model }))
+  // Where the content actually goes. With the endpoint configurable this stops
+  // being a constant, and a wrong one is indistinguishable from a plugin that
+  // does nothing: the key resolves, every request 401s, and fail-open hides it.
+  lines.push(t(lang, 'status.endpoint', { url: settings.baseUrl }))
   lines.push('')
 
   // Credentials: re-resolved here exactly as every operation does, so this
