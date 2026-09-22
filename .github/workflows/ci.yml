@@ -43,3 +43,28 @@ jobs:
       # that would ship local state is caught long before a tag exists.
       - name: The tarball carries nothing local
         run: node scripts/check-tarball.mjs
+
+  # `engines` promises Node 20, and only the *artifact* can be checked there:
+  # the suite is TypeScript, and Node strips types by default only from 24
+  # (22.6 behind a flag). So the two claims are verified separately — the suite
+  # on 24 above, and the thing a Node 20 consumer actually loads here.
+  runtime-floor:
+    name: node 20 · the built artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: The built entry loads on the declared floor
+        run: node scripts/check-runtime.mjs
+
