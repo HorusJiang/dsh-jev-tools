@@ -3,7 +3,7 @@
 **English** | [中文](README.md)
 
 <p align="center">
-  <img src="docs/banner.png" width="100%" alt="dsh-jev-tools — Jev judgments inside DeepSeek Harness: prune oversized tool output, screen fetched pages for injected instructions, suggest a skill, plus the jev_ask and jev_gate tools" />
+  <img src="docs/banner.png" width="100%" alt="dsh-jev-tools — a triage desk for the model: Jev judgments inside DeepSeek Harness, deciding at four points (prune, screen, suggest, gate) before anything is acted on. The banner artwork is in Chinese." />
 </p>
 
 <p align="center">

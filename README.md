@@ -3,7 +3,7 @@
 [English](README.en.md) | **中文**
 
 <p align="center">
-  <img src="docs/banner.png" width="100%" alt="dsh-jev-tools —— 把 Jev 判定模型接进 DeepSeek Harness：精简工具输出、筛查注入指令、推荐技能，外加 jev_ask 与 jev_gate 两个工具" />
+  <img src="docs/banner.png" width="100%" alt="dsh-jev-tools —— 大模型的预诊台：把 Jev 判定模型接进 DeepSeek Harness，在精简输出、注入筛查、技能推荐、交付闸门四个节点先判定再放行" />
 </p>
 
 <p align="center">

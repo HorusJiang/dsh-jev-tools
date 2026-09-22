@@ -10,11 +10,13 @@
 banner 描述的是这个插件**做什么**，不是它现在是第几版——第几版由 README 徽章和 CHANGELOG 负责。
 所以这个文件里也不该出现版本号字面量，包括注释：一个会过期的数字放哪儿都会过期。
 
-**文案只能是英文。** 中英两份 README 共用这一个 `docs/banner.png`，往里塞中文就等于把另一侧
-变成一屏乱码。想表达类比，就用英文把类比写出来（"a triage desk for the context window"），
-而不是把中文原句搬进来。
+**正文一律中文。** 英文 README 直接显示同一张 `docs/banner.png`，不做第二张——
+两套图会各自漂移，而读者只看得见漂移后的不一致。只有包名（`dsh-jev-tools`）与品牌
+专名（DeepSeek Harness、TypeSafe Jev）保持原文，它们本来就不该翻译。
 
-与 `render_poster.py` 一样，这个脚本是自洽的：改文案后重跑即可，不依赖任何其它模块。
+中文必须走真实字体排版，并且与拉丁片段**共用一条基线**：CJK 与拉丁两套字体的
+ascender 不同，逐段各画各的会让同一行的字上下跳动。这段逻辑与 `render_poster.py`
+是同一套做法；两个脚本仍各自自洽，不互相 import。
 
 用法：python artwork/render_banner.py
 输出：docs/banner.png
@@ -50,6 +52,8 @@ FONTS = {
     "ui_bold": ["C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/arialbd.ttf"],
     "ui": ["C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf"],
     "ui_semibold": ["C:/Windows/Fonts/seguisb.ttf", "C:/Windows/Fonts/segoeuib.ttf"],
+    "cn_bold": ["C:/Windows/Fonts/msyhbd.ttc", "C:/Windows/Fonts/simhei.ttf"],
+    "cn": ["C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf"],
     "mono": ["C:/Windows/Fonts/consola.ttf"],
     "mono_bold": ["C:/Windows/Fonts/consolab.ttf", "C:/Windows/Fonts/consola.ttf"],
 }
@@ -81,15 +85,54 @@ def rgb_of(hexstr: str) -> tuple[int, int, int]:
 
 
 # ---------------------------------------------------------------- primitives
+CJK_MIN = 0x2E80  # 以下当拉丁/符号处理（·、×、— 都落在两套字体的安全区）
+
+
+def runs(s: str) -> list[tuple[str, str]]:
+    """把一行拆成 CJK / 拉丁 两种字体的连续片段。"""
+    out: list[list[str]] = []
+    for ch in s:
+        k = "cn" if ord(ch) >= CJK_MIN else "lat"
+        if out and out[-1][0] == k:
+            out[-1][1] += ch
+        else:
+            out.append([k, ch])
+    return [(k, v) for k, v in out]
+
+
 def baseline(f: ImageFont.FreeTypeFont, top: float) -> float:
     return top + f.getmetrics()[0] / SCALE
 
 
 def draw_at(d: ImageDraw.ImageDraw, x: float, top: float, s: str,
-            f: ImageFont.FreeTypeFont, fill) -> float:
-    """Draw on the baseline, returning the x just past the text."""
-    d.text((u(x), u(baseline(f, top))), s, font=f, fill=fill, anchor="ls")
+            f: ImageFont.FreeTypeFont, fill, by: float | None = None) -> float:
+    """按基线绘制，返回结束 x。传 by 可让不同字号的片段共用一条基线。"""
+    d.text((u(x), u(by if by is not None else baseline(f, top))), s,
+           font=f, fill=fill, anchor="ls")
     return x + d.textlength(s, font=f) / SCALE
+
+
+def draw_mixed(d: ImageDraw.ImageDraw, x: float, top: float, s: str,
+               f_cn: ImageFont.FreeTypeFont, f_lat: ImageFont.FreeTypeFont,
+               fill, by: float | None = None) -> float:
+    """中英混排：共用一条基线，中文走 CJK 字体，拉丁/数字走拉丁字体。"""
+    base_y = by if by is not None else baseline(f_cn, top)
+    cx = x
+    for kind, seg in runs(s):
+        f = f_cn if kind == "cn" else f_lat
+        d.text((u(cx), u(base_y)), seg, font=f, fill=fill, anchor="ls")
+        cx += d.textlength(seg, font=f) / SCALE
+    return cx
+
+
+def width_of(d: ImageDraw.ImageDraw, s: str,
+             f_cn: ImageFont.FreeTypeFont,
+             f_lat: ImageFont.FreeTypeFont | None = None) -> float:
+    total = 0.0
+    for kind, seg in runs(s):
+        f = f_cn if (kind == "cn" or f_lat is None) else f_lat
+        total += d.textlength(seg, font=f) / SCALE
+    return total
 
 
 def draw_spaced(d: ImageDraw.ImageDraw, x: float, y: float, s: str,
@@ -186,14 +229,14 @@ def draw_topbar(img: Image.Image) -> None:
 def draw_content(img: Image.Image) -> None:
     f_eyebrow = font("mono_bold", 15)
     f_title = font("ui_bold", 68)
-    f_lede = font("ui_semibold", 30)
-    f_tag = font("ui", 21)
-    f_pill = font("ui_semibold", 15)
-    f_foot = font("mono", 12.5)
+    f_lede = font("cn_bold", 30)
+    f_tag = font("cn", 21)
+    f_pill = font("cn", 15)
+    f_foot = font("cn", 13)
 
     d = ImageDraw.Draw(img)
 
-    # ---- eyebrow
+    # ---- eyebrow（品牌专名，保持原文）
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     draw_spaced(ImageDraw.Draw(layer), PAD, 44, "DEEPSEEK HARNESS × TYPESAFE JEV",
                 f_eyebrow, CYAN, 4.2)
@@ -201,8 +244,8 @@ def draw_content(img: Image.Image) -> None:
     img.alpha_composite(layer)
     d = ImageDraw.Draw(img)
 
-    # ---- title（无版本号：那是徽章与 CHANGELOG 的职责）
-    y_title = 64
+    # ---- title（包名，不可翻译；无版本号：那是徽章与 CHANGELOG 的职责）
+    y_title = 66
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ImageDraw.Draw(layer).text((u(PAD), u(baseline(f_title, y_title))), "dsh-jev-tools",
                                font=f_title, fill=INK, anchor="ls")
@@ -211,27 +254,30 @@ def draw_content(img: Image.Image) -> None:
     d = ImageDraw.Draw(img)
 
     # ---- lede：banner 得自己回答「它是什么」。
-    # 口号回答不了这个问题（"judgment, not generation" 是性质，不是身份），
-    # 所以这里放预诊台那句类比，并用暖色把它顶到标题之后、口号之前——它是主角。
-    y_lede = 166
+    # 口号回答不了这个问题（"判定，而非生成" 是性质，不是身份），所以这一行放
+    # 预诊台那句类比，并用暖色把它拎出来——三段共用一条基线，否则中文与拉丁
+    # 两套 ascender 会让这一行自己错位。
+    y_lede = 170
+    by_lede = baseline(f_lede, y_lede)
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    draw_at(ImageDraw.Draw(layer), PAD, y_lede, "A triage desk for the context window.",
-            f_lede, AMBER)
+    ld = ImageDraw.Draw(layer)
+    x = draw_at(ld, PAD, y_lede, "它是", f_lede, "#C7D6EA", by=by_lede)
+    x = draw_at(ld, x, y_lede, "大模型的预诊台", f_lede, AMBER, by=by_lede)
+    draw_at(ld, x, y_lede, "：只分诊，不诊断", f_lede, "#8FA3BE", by=by_lede)
     img.alpha_composite(glow(layer, 11, 0.5))
     img.alpha_composite(layer)
     d = ImageDraw.Draw(img)
 
     # ---- tagline
-    y_tag = 212
-    x = draw_at(d, PAD, y_tag, "Judgment, not generation", f_tag, "#DCE7F7")
-    draw_at(d, x + 8, y_tag, "— wired into the harness.", f_tag, DIM)
+    draw_at(d, PAD, 216, "不生成文本，也不替代主模型——只在关键节点插一次判定",
+            f_tag, DIM)
 
-    # ---- capability pills
-    y_pill, pill_h, gap = 254, 34, 14
+    # ---- capability pills（与海报的四张卡片同名，两处不能各说各的）
+    y_pill, pill_h, gap = 258, 34, 14
     cx = PAD
-    for label, accent in (("Prune", CYAN), ("Screen", AMBER),
-                          ("Suggest", VIOLET), ("Gate", GREEN)):
-        tw = d.textlength(label, font=f_pill) / SCALE
+    for label, accent in (("精简输出", CYAN), ("注入筛查", AMBER),
+                          ("技能推荐", VIOLET), ("交付闸门", GREEN)):
+        tw = width_of(d, label, f_pill)
         pw = tw + 34
         box = (cx, y_pill, cx + pw, y_pill + pill_h)
         rgb = rgb_of(accent)
@@ -243,10 +289,8 @@ def draw_content(img: Image.Image) -> None:
         cx += pw + gap
 
     # ---- footer（两行不变，是这套设计的"性质"清单）
-    draw_at(d, PAD, 326, "no text generation · typed questions · probabilities · one request",
-            f_foot, DIMMER)
-    draw_at(d, PAD, 348, "inert without a key · never blocks a step · every judgment recorded",
-            f_foot, DIMMER)
+    draw_at(d, PAD, 330, "带类型的问题 · 返回概率 · 无需解析 · 一次请求", f_foot, DIMMER)
+    draw_at(d, PAD, 352, "无 key 完全惰性 · 绝不阻挡步骤 · 每次判定都记账", f_foot, DIMMER)
 
 
 def main() -> None:
