@@ -9,5 +9,5 @@
 #
 # That test recomputes these hashes with `node:crypto`, so no git and no repository
 # are needed, and it also checks that the two sides keep the same structure.
-README.md: 7958c00e353aaabbad75a7f166fc9a6e6ebccae9
-README.en.md: 5064cfc0a82029a2e658216d35dc437c30a91edb
+README.md: 5cc02b0f21af6eec4c7d97fd9535ad2a709f2157
+README.en.md: cf0baadbce7cb629a6556d9f6ffe0f071b775263

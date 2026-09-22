@@ -11,8 +11,8 @@
   2. 所有文字按「基线」对齐；混排中英文时共用一个基线，否则两套字体的
      ascender 不同会让同一行的字上下跳动。
 
-用法：python poster/render_poster.py
-输出：poster/dsh-jev-tools-poster.png
+用法：python artwork/render_poster.py
+输出：artwork/dsh-jev-tools-poster.png
 """
 
 from __future__ import annotations
@@ -386,7 +386,12 @@ def draw_content(img: Image.Image) -> None:
     panel(img, kbox, 16, (8, 16, 30, 150), (255, 255, 255, 30))
     d = ImageDraw.Draw(img)
 
-    draw_at(d, PAD + 24, ky + 18, "为什么不是「再问一次 LLM」", f_blk_t, "#8FA3BE")
+    # 这一格以前是「为什么不是再问一次 LLM」的两栏对照，现在换成预诊台类比。
+    # 一次回答两个问题：Jev 是什么（左栏是那个熟悉的东西，右栏是映射关系），
+    # 以及为什么不能拿它替代主模型（分诊不等于诊断）。技术上的精确差别
+    # （同源、RLCD、三条后训练路线）留给 README——海报负责直觉，文档负责准确。
+    draw_at(d, PAD + 24, ky + 18, "它像医院的预诊台：只判断该挂哪个科，不诊断",
+            f_blk_h, "#DCE7F7")
 
     colw, colgap = 430, 28
     lx, rx = PAD + 24, PAD + 24 + colw + colgap
@@ -395,10 +400,10 @@ def draw_content(img: Image.Image) -> None:
            fill=(255, 255, 255, 26), width=max(1, u(1)))
 
     for x, head, accent, bullets in (
-        (lx, "Jev · System One 判定模型", CYAN,
-         ["不生成文本，只回答带类型的问题", "快、便宜，输出可直接被代码消费"]),
-        (rx, "通用 LLM", GREY,
-         ["生成自由文本，强推理与写作", "慢、贵，输出还要再解析一遍"]),
+        (lx, "医院的预诊台", GREY,
+         ["听你说症状，几秒判断挂哪个科", "不知道你得的是什么病"]),
+        (rx, "Jev · System One 判定模型", CYAN,
+         ["读一份 state，返回选项与概率", "不解释理由，也不生成文本"]),
     ):
         draw_at(d, x, hy, head, f_blk_h, accent)
         for j, b in enumerate(bullets):
@@ -407,7 +412,7 @@ def draw_content(img: Image.Image) -> None:
             draw_at(d, x + 18, by2, b, f_blk_b, "#AEBFD4")
 
     draw_at(d, PAD + 24, ky + 140,
-            "所以它不替代主模型——只在关键节点插一次高效判定。", f_blk_f, "#DCE7F7")
+            "分诊不等于诊断——它不替代主模型，只在关键节点插一次高效判定。", f_blk_f, "#DCE7F7")
 
     # ---- 三条性质（作用域必须写明：闸门刻意相反）
     py, ph = ky + kh + 12, 42

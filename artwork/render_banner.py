@@ -10,6 +10,10 @@
 banner 描述的是这个插件**做什么**，不是它现在是第几版——第几版由 README 徽章和 CHANGELOG 负责。
 所以这个文件里也不该出现版本号字面量，包括注释：一个会过期的数字放哪儿都会过期。
 
+**文案只能是英文。** 中英两份 README 共用这一个 `docs/banner.png`，往里塞中文就等于把另一侧
+变成一屏乱码。想表达类比，就用英文把类比写出来（"a triage desk for the context window"），
+而不是把中文原句搬进来。
+
 与 `render_poster.py` 一样，这个脚本是自洽的：改文案后重跑即可，不依赖任何其它模块。
 
 用法：python artwork/render_banner.py
@@ -181,8 +185,9 @@ def draw_topbar(img: Image.Image) -> None:
 # ---------------------------------------------------------------- content
 def draw_content(img: Image.Image) -> None:
     f_eyebrow = font("mono_bold", 15)
-    f_title = font("ui_bold", 76)
-    f_tag = font("ui", 23)
+    f_title = font("ui_bold", 68)
+    f_lede = font("ui_semibold", 30)
+    f_tag = font("ui", 21)
     f_pill = font("ui_semibold", 15)
     f_foot = font("mono", 12.5)
 
@@ -190,14 +195,14 @@ def draw_content(img: Image.Image) -> None:
 
     # ---- eyebrow
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    draw_spaced(ImageDraw.Draw(layer), PAD, 48, "DEEPSEEK HARNESS × TYPESAFE JEV",
+    draw_spaced(ImageDraw.Draw(layer), PAD, 44, "DEEPSEEK HARNESS × TYPESAFE JEV",
                 f_eyebrow, CYAN, 4.2)
     img.alpha_composite(glow(layer, 8, 0.9))
     img.alpha_composite(layer)
     d = ImageDraw.Draw(img)
 
     # ---- title（无版本号：那是徽章与 CHANGELOG 的职责）
-    y_title = 70
+    y_title = 64
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ImageDraw.Draw(layer).text((u(PAD), u(baseline(f_title, y_title))), "dsh-jev-tools",
                                font=f_title, fill=INK, anchor="ls")
@@ -205,13 +210,24 @@ def draw_content(img: Image.Image) -> None:
     img.alpha_composite(layer)
     d = ImageDraw.Draw(img)
 
+    # ---- lede：banner 得自己回答「它是什么」。
+    # 口号回答不了这个问题（"judgment, not generation" 是性质，不是身份），
+    # 所以这里放预诊台那句类比，并用暖色把它顶到标题之后、口号之前——它是主角。
+    y_lede = 166
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw_at(ImageDraw.Draw(layer), PAD, y_lede, "A triage desk for the context window.",
+            f_lede, AMBER)
+    img.alpha_composite(glow(layer, 11, 0.5))
+    img.alpha_composite(layer)
+    d = ImageDraw.Draw(img)
+
     # ---- tagline
-    y_tag = 186
+    y_tag = 212
     x = draw_at(d, PAD, y_tag, "Judgment, not generation", f_tag, "#DCE7F7")
     draw_at(d, x + 8, y_tag, "— wired into the harness.", f_tag, DIM)
 
     # ---- capability pills
-    y_pill, pill_h, gap = 240, 34, 14
+    y_pill, pill_h, gap = 254, 34, 14
     cx = PAD
     for label, accent in (("Prune", CYAN), ("Screen", AMBER),
                           ("Suggest", VIOLET), ("Gate", GREEN)):
@@ -227,9 +243,9 @@ def draw_content(img: Image.Image) -> None:
         cx += pw + gap
 
     # ---- footer（两行不变，是这套设计的"性质"清单）
-    draw_at(d, PAD, 314, "no text generation · typed questions · probabilities · one request",
+    draw_at(d, PAD, 326, "no text generation · typed questions · probabilities · one request",
             f_foot, DIMMER)
-    draw_at(d, PAD, 336, "inert without a key · never blocks a step · every judgment recorded",
+    draw_at(d, PAD, 348, "inert without a key · never blocks a step · every judgment recorded",
             f_foot, DIMMER)
 
 

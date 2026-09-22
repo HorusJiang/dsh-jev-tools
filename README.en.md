@@ -17,7 +17,17 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai) plugin that puts **[Jev](https://typesafe.ai)** inside a long session and judges things before they reach the context.
 
-Jev is TypeSafe's System One judgment model, and it **generates no text** — you hand it a `state` and typed questions, and it returns choices and probabilities. That makes it fast, cheap, and directly consumable by code, but it is **no substitute for the main model**. See the [official docs](https://docs.typesafe.ai/introduction).
+## What it is like: a triage desk for the model
+
+A hospital triage desk hears your symptoms and decides, in seconds, which department you most likely belong in. It does not know what is wrong with you, and it does not treat you — once you are triaged, the real work goes to a specialist.
+
+Jev is that triage desk, with "which department" replaced by "should this content enter the context". It is TypeSafe's System One judgment model: hand it a `state` and typed questions and it returns **choices and probabilities** — no generated text, no reasons attached. That makes it fast, cheap, and directly consumable by code. See the [official docs](https://docs.typesafe.ai/introduction).
+
+Two things are worth being clear about, and one is yours to own:
+
+- **It is not another large language model.** As TypeSafe puts it, pretrained language models have been adapted along three post-training paths — RLHF produced chatbots, RLVR produced reasoning models (strong at tasks such as mathematics, but slower and more expensive), and RLCD produced judgment models like Jev. Same base, different training objective. See the [AI primer](https://docs.typesafe.ai/introduction/machine-learning-primer).
+- **It is no substitute for the main model.** A triage desk does not treat you; all writing, reasoning, and tool calls still belong to the main model.
+- **You define the answer space.** A hospital's department list is fixed, but Jev's is supplied per call — so whether it sorts correctly depends in part on how well you designed the options.
 
 ## Features
 
