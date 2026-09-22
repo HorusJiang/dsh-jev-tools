@@ -8,6 +8,10 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/dsh-jev-tools"><img src="https://img.shields.io/npm/v/dsh-jev-tools?style=flat-square&label=npm&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/dsh-jev-tools"><img src="https://img.shields.io/npm/dm/dsh-jev-tools?style=flat-square&label=downloads&color=cb3837" alt="npm downloads" /></a>
+  <a href="https://github.com/HorusJiang/dsh-jev-tools/actions/workflows/ci.yml"><img src="https://github.com/HorusJiang/dsh-jev-tools/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
+  <a href="https://github.com/HorusJiang/dsh-jev-tools/blob/main/package.json"><img src="https://img.shields.io/node/v/dsh-jev-tools?style=flat-square" alt="node engine" /></a>
+  <a href="https://awesome-dsh-plugin.com"><img src="https://img.shields.io/badge/awesome--dsh--plugin-listed-2f6feb?style=flat-square" alt="listed in awesome-dsh-plugin" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="license: MIT" /></a>
 </p>
 
