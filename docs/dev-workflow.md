@@ -146,6 +146,17 @@ PowerShell 按 GBK 解码 UTF-8 文件：控制台输出变乱码，**而且行�
 
 **规则：统计/校验非 ASCII 文件一律用 Node 显式 `utf8` 读，或直接看 `edit` / `read` 工具的结果。改含非 ASCII 的源文件绝不用 `Get-Content` + `Set-Content`（会写成乱码，我因此重写过一次 `prune.ts`）。**
 
+**同一个坑的第三种形态（2026-09-22 实测）**：PowerShell 5.1 的 `>` 与 `Out-File` **默认写 UTF-16LE**。用它把生成好的文本落盘、再交给按 UTF-8 读的工具，字节就被改写了——`node scripts/release-notes.ts 0.1.7 > notes.md` 之后 `gh release create --notes-file notes.md`，GitHub 上的 Release 正文变成一串 `^@`（每个字符之间夹一个 NUL：4286 字节的正文被读成 9952 个字符的乱码）。
+
+需要字节不被改写时：
+
+| 场景 | 用 | 不要用 |
+|---|---|---|
+| 程序的 stdout 直接落盘 | `cmd /c "node x.ts > out.md"`（cmd 的重定向按字节写） | PowerShell 的 `>` / `Out-File` |
+| 自己构造内容 | `write` 工具，或 Node 的 `fs.writeFileSync(..., 'utf8')` | `Set-Content` |
+
+注意这条**只影响本地手工操作**：CI 里 `shell: bash` 的 `>` 是按字节写的，所以 workflow 内的同一条命令没有这个问题——而在本机复现 CI 步骤时就会撞上。
+
 ## 11. 双语文档的维护约定
 
 `README.md` + `README.en.md`、`CHANGELOG.md` + `CHANGELOG.en.md`：**每份文档都是三个兄弟文件**——一个不加后缀的 `foo.md`、一个带语言后缀的 `foo.<lang>.md`、外加一个 `foo.i18n.yaml`。两份内容是**对等的两份正文**，不是"原文 + 摘要"。
