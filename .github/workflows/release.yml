@@ -1,35 +1,54 @@
 name: release
 
-# A tag is the only thing that publishes. There is deliberately no
-# `workflow_dispatch`: `npm publish` ships whatever package.json says, so a
-# manual trigger is a path to publishing a version nobody tagged, and the
+# Releasing is two steps, and the second one is a human.
+#
+#   1. `git tag vX.Y.Z && git push origin vX.Y.Z` — this workflow runs the same
+#      gates CI runs, then **stages** the package with `npm stage publish`.
+#      Nothing is public yet.
+#   2. A maintainer approves the staged version with 2FA — `npm stage approve
+#      <stage-id>`, or the Staged Packages tab on npmjs.com — and then publishes
+#      the draft Release this workflow left behind:
+#          gh release edit vX.Y.Z --draft=false
+#      Both commands are printed in the run summary, so the run itself says what
+#      is left to do.
+#
+# Why it is two steps: the trusted publisher is configured **stage-only** —
+# `npm publish` is not among its allowed actions — so a compromised workflow
+# cannot put a package in front of the world on its own. The tag says "this is a
+# release candidate"; the 2FA prompt is what says "and this is a release".
+#
+# A tag is still the only thing that triggers this. There is deliberately no
+# `workflow_dispatch`: `npm stage publish` uploads whatever package.json says, so
+# a manual trigger would be a path to staging a version nobody tagged, and the
 # version check below closes that by construction rather than by remembering.
 #
 # ## One-time setup, on the npm side
 #
-# This uses npm's trusted publishing: GitHub hands npm a short-lived OIDC token
-# and npm attaches provenance automatically, so there is no long-lived
-# NPM_TOKEN secret to leak or rotate. It must be enabled once per package:
+# Package settings -> Trusted publishing -> Add trusted publisher -> GitHub Actions:
 #
-#   npmjs.com -> the package -> Settings -> Trusted Publisher -> GitHub Actions
-#     organization or user : HorusJiang
-#     repository           : dsh-jev-tools
-#     workflow filename    : release.yml
-#     environment          : (leave empty)
+#   organization or user : HorusJiang
+#   repository           : dsh-jev-tools
+#   workflow filename    : release.yml     (filename only, no path)
+#   environment          : (leave empty)
+#   allowed actions      : leave `npm publish` UNCHECKED — staged publishing only
 #
-# Until that is configured, the publish step fails with a 403 naming the missing
-# trusted publisher. Publishing by hand still works meanwhile — this workflow
-# replaces that habit, it does not block it.
+# Two more prerequisites from npm's own docs: the package must already exist on
+# the registry, and **2FA must be enabled on the account** — approval, by CLI or
+# on the website, is a proof-of-presence step and cannot be done without it.
+#
+# A connection's provider and required fields cannot be edited after it is
+# created, so a wrong value means deleting the connection and adding it again.
 on:
   push:
     tags: ['v*']
 
 permissions:
   contents: read
-  id-token: write # the OIDC token npm exchanges for a one-shot publish grant
+  id-token: write # the OIDC token npm exchanges for a staging grant
 
 jobs:
-  publish:
+  stage:
+    name: stage on npm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -40,9 +59,20 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false # never cache in a release build
 
-      # The runner's bundled npm may predate trusted publishing (needs >= 11.5.1).
-      - name: Ensure npm supports trusted publishing
-        run: npm install --global npm@latest
+      # Pinned to the oldest npm that can do both jobs, inside the major this
+      # runner's Node supports — deliberately not `@latest`:
+      #
+      #   >= 11.5.1   trusted publishing (OIDC)
+      #   >= 11.15.0  staged publishing (`npm stage publish`)
+      #
+      # `@latest` is not merely unnecessary here, it is wrong, and 0.1.7's run
+      # measured how: it installs npm 12, whose engines are
+      # `^22.22.2 || ^24.15.0 || >=26.0.0`, while the runner's node 24 is older
+      # than 24.15. npm then warns EBADENGINE and runs on a Node it does not
+      # support — a release path that depends on that is a release path that
+      # breaks on someone else's schedule.
+      - name: Ensure npm can stage and use trusted publishing
+        run: npm install --global 'npm@^11.15.0'
 
       # The tag and the manifest must agree before anything is uploaded, because
       # the publish itself takes the version from package.json and ignores the tag.
@@ -62,7 +92,7 @@ jobs:
         run: npm ci
 
       # The same gates CI runs on main, so only something those gates already
-      # passed can ship.
+      # passed can be staged.
       - name: Build and test
         run: npm test
 
@@ -70,20 +100,40 @@ jobs:
         run: node scripts/check-tarball.mjs
 
       # No token and no `--provenance` flag: npm takes the OIDC identity for the
-      # publish grant and attaches provenance itself for a public package.
-      - name: Publish to npm
-        run: npm publish
+      # grant and attaches provenance itself for a public package. Note that
+      # staging does *not* need 2FA — only approving the staged package does.
+      - name: Stage on npm
+        run: npm stage publish
 
-  # A separate job with separate permissions on purpose: creating a Release
-  # writes to the repository, and the job that exchanges an OIDC token for a
-  # publish grant should not also be able to write to it. Least privilege per
-  # job, not per workflow.
+      - name: What is left to do
+        shell: bash
+        run: |
+          {
+            echo "### Staged \`${GITHUB_REF_NAME}\` — nothing is public yet"
+            echo
+            echo "Approve it with 2FA, then publish the draft Release:"
+            echo
+            echo '```bash'
+            echo "# find the <stage-id> (needs npm >= 11.15.0 locally)"
+            echo "npm stage list dsh-jev-tools"
+            echo "# prompts for 2FA; npmjs.com -> Staged Packages works too"
+            echo "npm stage approve <stage-id>"
+            echo "gh release edit ${GITHUB_REF_NAME} --draft=false"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # A separate job with its own permissions on purpose: creating a Release writes
+  # to the repository, and the job that exchanges an OIDC token for a staging
+  # grant should not also be able to write to it. Least privilege per job, not
+  # per workflow.
   #
-  # It runs only after a successful publish, so a release note never announces a
-  # version that did not make it to the registry.
+  # The Release is a **draft**, because at this point the package is staged and
+  # not public: an announcement that goes out before the thing it announces is
+  # the one mistake this whole flow exists to make impossible. Step 2 above
+  # publishes it.
   release:
-    name: GitHub Release
-    needs: publish
+    name: draft GitHub Release
+    needs: stage
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -94,7 +144,7 @@ jobs:
       # because they are peers rather than an original and a summary. The script
       # exits non-zero when the section is missing, which is the point: an empty
       # release is worse than a red workflow, since nobody sees it fail.
-      - name: Create the Release
+      - name: Draft the Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -102,5 +152,5 @@ jobs:
           node scripts/release-notes.ts "${GITHUB_REF_NAME#v}" > release-notes.md
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
+            --draft \
             --notes-file release-notes.md
-

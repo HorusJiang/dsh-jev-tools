@@ -251,4 +251,22 @@ npm 页面上的 README 取自发布时的 tarball，但"README 想立刻更新"
 
 （本文档本身的改动就是这条规则的第一个例子：它**没有**伴随任何版本号。）
 
+### 发版动作：两步，中间是人（2026-09-22 起）
+
+打 tag 之后 workflow 只把包 **stage 到 npm 暂存区**，不公开。剩下两步由人做：
+
+```powershell
+npm stage list dsh-jev-tools              # 拿 <stage-id>
+npm stage approve <stage-id>              # 会要求 2FA；也可在 npmjs.com 的 Staged Packages 页点 Approve
+gh release edit v0.1.8 --draft=false      # 把 workflow 留下的草稿 Release 转正
+```
+
+**为什么这样设计**：trusted publisher 的 Allowed actions 刻意只留 `npm stage publish`（不勾 `npm publish`）。因此**一个被攻陷的 workflow 无法自己把包推给全世界**——tag 表示"这是候选"，2FA 那一下才表示"这是发布"。Release 也只能先是草稿：包还没公开时先发公告，正是这套流程要消灭的那种错误。
+
+三条实测约束：
+
+- **`npm stage` 需要 npm >= 11.15.0**（trusted publishing 只要 >= 11.5.1）。所以 workflow 里装的是 `npm@^11.15.0` 而**不是** `@latest`：npm 12 的 engines 是 `^22.22.2 || ^24.15.0 || >=26.0.0`，而 runner 的 Node 24 比 24.15 旧——装上去只会得到 EBADENGINE 警告，并在一个它声明不支持的 Node 上跑（0.1.7 那次就是这么跑的，侥幸没炸）。
+- **批准必须有 2FA**，CLI 与网页都一样：这是 proof-of-presence 步骤。账号没启用 2FA 就做不了（staged publishing 的前置条件之一）。
+- **`list` / `view` / `approve` / `reject` 不能用 OIDC**，只能在本地交互式执行。所以 workflow 能做的只有 stage，剩下的一定是人。
+
 

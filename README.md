@@ -169,7 +169,7 @@ npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH �
 
 改了 `lib/` 之后**必须重启 `dsh web`**：关开插件开关不会重新导入 ESM 模块。
 
-推送到 `main` 会自动跑 CI（ubuntu + windows × node 24：`npm ci` → `npm test` → tarball 检查）。发布靠打 tag：推一个 `v*` tag 会走 `.github/workflows/release.yml`——先校验 tag 与 `package.json` 的版本一致，再跑同一套门禁，最后经 npm trusted publishing 发布（无长期 token；首次需在 npm 侧配置一次 trusted publisher，workflow 头部注释里有步骤）。npm 接受之后，同一个 workflow 会再建一条 **GitHub Release**，正文就是 CHANGELOG 里该版本的**两种语言正文**——两边是对等正文而非译文摘要，所以 Release 不做取舍。
+推送到 `main` 会自动跑 CI（ubuntu + windows × node 24：`npm ci` → `npm test` → tarball 检查）。发布靠打 tag，而且是**两步**：推一个 `v*` tag 会走 `.github/workflows/release.yml`——先校验 tag 与 `package.json` 的版本一致，再跑同一套门禁，然后经 npm trusted publishing 把包 **stage 到暂存区**（无长期 token）。此时**什么都还没公开**：你带 2FA 执行 `npm stage approve <stage-id>`（或在 npmjs.com 的 Staged Packages 页点 Approve），再把 workflow 留下的**草稿 Release** 转正（`gh release edit vX.Y.Z --draft=false`）——这两条命令会打印在运行摘要里。之所以要两步：trusted publisher 的 Allowed actions 刻意**不勾** `npm publish`，于是一个被攻陷的 workflow 无法自己把包推给全世界；tag 表示"这是候选"，2FA 那一下才表示"这是发布"（首次仍需在 npm 侧配置一次 trusted publisher，workflow 头部注释里有逐字步骤）。Release 正文取自 CHANGELOG 里该版本的**两种语言正文**，因为两边是对等正文而非译文摘要。
 
 ## License
 
