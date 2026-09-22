@@ -216,3 +216,75 @@ test('the renderer survives a value it does not recognise', () => {
   assert.equal(blocks[0]?.type, 'text')
   assert.match(blocks[0]?.text ?? '', /no judgment/)
 })
+
+// ── quotas, and what a refusal looks like ───────────────────────────────────
+
+test('more than three calls in one session still succeed', async () => {
+  // The regression. `tryConsume(agentId, -1)` passed a pseudo-turn that never
+  // advances, so a *per-turn* ceiling behaved as a session-long cap of three:
+  // the fourth call onwards was refused with `budget-turn` for the rest of the
+  // session. Measured 2026-09-22 against a live session, where `jev_ask` simply
+  // stopped answering after three uses and reported only `(no judgment)`.
+  const { tool, calls } = harness()
+  for (let i = 1; i <= 6; i += 1) {
+    const result = await tool.execute(ASK, EXEC) as Record<string, unknown>
+    assert.equal(result.ok, true, `call ${i} must still be judged`)
+  }
+  assert.equal(calls(), 6)
+})
+
+test('the session ceiling still bounds explicit calls', async () => {
+  const tool = createJevAskTool({
+    settings: () => resolveSettings({ sessionCallLimit: 2 }),
+    credentials: () => KEYED,
+    backendFor: () => ({
+      id: 'fake',
+      judge: async () => ({ model: 'jev-1.13.0', answers: { refund: { type: 'noul', noul: 0.5 } } as never }),
+    }),
+    cache: chineseCache(),
+    budget: createBudget(3, 2),
+    ledger: createMemoryLedger(),
+    now: () => 1,
+  })
+  const first = await tool.execute(ASK, EXEC) as Record<string, unknown>
+  const second = await tool.execute(ASK, EXEC) as Record<string, unknown>
+  const third = await tool.execute(ASK, EXEC) as Record<string, unknown>
+  assert.equal(first.ok, true)
+  assert.equal(second.ok, true)
+  // The session ceiling is the one that actually applies to an explicit call.
+  assert.equal(third.ok, false)
+  assert.equal(third.problem, 'budget-session')
+  assert.match(String(third.detail), /at most 2/)
+})
+
+test('a decline renders its reason rather than an opaque placeholder', async () => {
+  // The renderer reads only `report`, and a decline used to carry just
+  // `message`/`detail` — so a missing key, an invalid request and an exhausted
+  // quota all showed up as `(no judgment)` in the one place the README says
+  // these failures are visible.
+  const missing: CredentialsService = {
+    resolve: async () => undefined,
+    describe: async () => ({ configured: false, writable: true }),
+  }
+  const { tool } = harness({ key: missing })
+  const result = await tool.execute(ASK, EXEC)
+  const blocks = tool.output.render(ASK, result) as { text: string }[]
+  const text = blocks[0]?.text ?? ''
+  assert.equal(/no judgment/.test(text), false)
+  assert.match(text, /TYPESAFE_API_KEY/)
+})
+
+test('a decline is recorded against the calling agent', async () => {
+  // The row hardcoded an empty agentId while the success path recorded the real
+  // one, so half of a tool's ledger could not be attributed to a session.
+  const missing: CredentialsService = {
+    resolve: async () => undefined,
+    describe: async () => ({ configured: false, writable: true }),
+  }
+  const { tool, ledger } = harness({ key: missing })
+  await tool.execute(ASK, EXEC)
+  const record = ledger.entries().at(-1)
+  assert.equal(record?.feature, 'tool')
+  assert.equal(record?.outcome, 'skipped')
+  assert.equal(record?.agentId, 'agent-1')
+})

@@ -292,3 +292,47 @@ test('the report is rendered in the conversation\u2019s language', async () => {
   assert.match(String(result.report), /c0 verified/)
   assert.match(String(result.report), /未提供 evidence/)
 })
+
+// ── quotas, and what a refusal looks like ───────────────────────────────────
+
+test('more than three calls in one session still succeed', async () => {
+  // Same regression as `jev_ask`: `tryConsume(agentId, -1)` used a pseudo-turn
+  // that never advances, turning a per-turn ceiling into a session-long cap of
+  // three. A gate that silently stops working is worse than a gate that is
+  // absent, because its silence reads as approval.
+  const { tool } = harness({ answers: { c0: verified(1), c1: verified(1) } })
+  for (let i = 1; i <= 6; i += 1) {
+    const result = await gate(tool, REQUEST)
+    assert.equal(result.ok, true, `call ${i} must still be judged`)
+  }
+})
+
+test('a refusal renders its reason rather than an opaque placeholder', async () => {
+  // The renderer reads only `report`; a decline used to carry just
+  // `message`/`detail`, so every refusal displayed as `(no gate verdict)` — and
+  // a refusal here means "unverified", which must not be silent.
+  const missing: CredentialsService = {
+    resolve: async () => undefined,
+    describe: async () => ({ configured: false, writable: true }),
+  }
+  const { tool } = harness({ key: missing })
+  const result = await gate(tool, REQUEST)
+  const blocks = tool.output.render(REQUEST, result) as { text: string }[]
+  const text = blocks[0]?.text ?? ''
+  assert.equal(/no gate verdict/.test(text), false)
+  assert.equal(result.action, 'escalate')
+  assert.match(text, /TYPESAFE_API_KEY/)
+})
+
+test('a refusal is recorded against the calling agent', async () => {
+  const missing: CredentialsService = {
+    resolve: async () => undefined,
+    describe: async () => ({ configured: false, writable: true }),
+  }
+  const { tool, ledger } = harness({ key: missing })
+  await gate(tool, REQUEST)
+  const record = ledger.entries().at(-1)
+  assert.equal(record?.feature, 'tool')
+  assert.equal(record?.outcome, 'skipped')
+  assert.equal(record?.agentId, 'agent-1')
+})

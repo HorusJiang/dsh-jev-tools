@@ -24,8 +24,23 @@ export type BudgetGrant =
 
 /** A per-turn and per-session allowance. */
 export interface Budget {
-  /** Consume one allowance, or report which ceiling stopped it. */
+  /**
+   * Consume one allowance for an automatic capability, bounded per turn as well
+   * as per session.
+   */
   tryConsume (agentId: string, turn: number): BudgetGrant
+  /**
+   * Consume one allowance for an explicit call, bounded per session only.
+   *
+   * The per-turn ceiling exists to bound the latency an *automatic* capability
+   * can add to a turn — measured, 27 uncapped triggers ≈ 8.1 s against 0.9 s at
+   * a cap of three. An explicit `jev_ask` / `jev_gate` is the caller asking for
+   * one answer, so that ceiling has no rationale there. Worse, such a call
+   * carries no turn number, and passing a placeholder turned the per-turn
+   * ceiling into a session-long cap of three: the fourth call onwards was
+   * refused with `budget-turn` for the rest of the session.
+   */
+  tryConsumeSession (agentId: string): BudgetGrant
   /** Judgments consumed in this session so far. */
   sessionUsage (agentId: string): number
   /** Judgments consumed in one turn so far. */
@@ -67,6 +82,12 @@ export function createBudget (perTurn: number, perSession: number, maxAgents = 6
       if (used >= perTurn) return { ok: false, reason: 'budget-turn' }
       counters.session += 1
       counters.turns.set(turn, used + 1)
+      return { ok: true }
+    },
+    tryConsumeSession (agentId) {
+      const counters = countersFor(agentId)
+      if (counters.session >= perSession) return { ok: false, reason: 'budget-session' }
+      counters.session += 1
       return { ok: true }
     },
     sessionUsage (agentId) {

@@ -194,10 +194,12 @@ export function createJevGateTool (deps: JevGateDeps): ToolDefinitionLike {
   const declined = (
     problem: SkipReason,
     detail: string,
-    lang: Lang
+    lang: Lang,
+    agentId: string
   ): Record<string, unknown> => {
+    const message = skipMessage(problem, lang)
     deps.ledger.record({
-      ts: deps.now(), agentId: '', feature: 'tool', backendId: 'jev', model: '',
+      ts: deps.now(), agentId, feature: 'tool', backendId: 'jev', model: '',
       latencyMs: 0, outcome: 'skipped', skip: problem,
     })
     return {
@@ -205,8 +207,12 @@ export function createJevGateTool (deps: JevGateDeps): ToolDefinitionLike {
       action: 'escalate' as GateAction,
       reasonCodes: ['gate_failed'],
       problem,
-      message: skipMessage(problem, lang),
+      message,
       detail,
+      // The renderer reads only `report`; without it every decline displayed as
+      // the opaque `(no gate verdict)`, so a missing key and an exhausted quota
+      // looked identical in the one place these failures are meant to be visible.
+      report: `${message}\n${detail}`,
     }
   }
 
@@ -280,20 +286,24 @@ export function createJevGateTool (deps: JevGateDeps): ToolDefinitionLike {
       const agentId = exec.agent?.id ?? ''
       const lang = detectLang(deps.cache.task(agentId))
 
-      if (!settings.enabled) return declined('disabled', 'The plugin master switch is off.', lang)
+      if (!settings.enabled) {
+        return declined('disabled', 'The plugin master switch is off.', lang, agentId)
+      }
 
       if (typeof args.request !== 'string' || args.request.trim() === '') {
-        return declined('invalid-request', '`request` must be a non-empty string.', lang)
+        return declined('invalid-request', '`request` must be a non-empty string.', lang, agentId)
       }
       if (!Array.isArray(args.claims) || args.claims.length === 0
         || !args.claims.every(claim => typeof claim === 'string' && claim.trim() !== '')) {
-        return declined('invalid-request', '`claims` must be a non-empty array of non-empty strings.', lang)
+        return declined('invalid-request', '`claims` must be a non-empty array of non-empty strings.',
+          lang, agentId)
       }
       // A cap rather than a rejection would silently check a subset, and a gate
       // that quietly drops claims is worse than one that refuses.
       if (args.claims.length > MAX_CLAIMS) {
         return declined('invalid-request',
-          `At most ${MAX_CLAIMS} claims per call; this call had ${args.claims.length}. Split it.`, lang)
+          `At most ${MAX_CLAIMS} claims per call; this call had ${args.claims.length}. Split it.`,
+          lang, agentId)
       }
       const autoAccept = typeof args.autoAccept === 'number' && args.autoAccept >= 0 && args.autoAccept <= 1
         ? args.autoAccept
@@ -343,19 +353,25 @@ export function createJevGateTool (deps: JevGateDeps): ToolDefinitionLike {
 
       const violations = validateRequest(request)
       if (violations.length > 0) {
-        return declined('invalid-request', violations.map(v => v.detail).join('; '), lang)
+        return declined('invalid-request', violations.map(v => v.detail).join('; '), lang, agentId)
       }
 
-      const grant = deps.budget.tryConsume(agentId, -1)
+      const grant = deps.budget.tryConsumeSession(agentId)
       if (!grant.ok) {
+        // Only the session ceiling can refuse here, so the detail names the
+        // ceiling that actually stopped it. The old text claimed the session
+        // allowance while the check performed was a per-turn one.
         return declined(grant.reason,
-          `This session allows at most ${settings.sessionCallLimit} judgments; raise it in settings.`, lang)
+          `This session allows at most ${settings.sessionCallLimit} judgments, shared with automatic `
+          + 'pruning and screening; raise the limit in the plugin settings. Nothing was verified, so '
+          + 'treat this delivery as unverified.',
+          lang, agentId)
       }
 
       const apiKey = await resolveApiKey(deps.credentials(), settings.apiKeyEnv)
       if (!apiKey.ok) {
         return {
-          ...declined('no-key', `Could not resolve a key from ${settings.apiKeyEnv}.`, lang),
+          ...declined('no-key', `Could not resolve a key from ${settings.apiKeyEnv}.`, lang, agentId),
           hint: `Create an API key at ${TYPESAFE_KEYS_URL} and paste it into the plugin settings page, `
             + `or set the environment variable ${settings.apiKeyEnv}. `
             + 'Nothing was verified, so treat this delivery as unverified.',
@@ -370,7 +386,7 @@ export function createJevGateTool (deps: JevGateDeps): ToolDefinitionLike {
       } catch (error) {
         const problem = error instanceof JevError ? error.problem : 'unknown'
         const detail = error instanceof Error ? error.message : String(error)
-        return declined(problem as SkipReason, detail, lang)
+        return declined(problem as SkipReason, detail, lang, agentId)
       }
 
       deps.ledger.record({

@@ -21,7 +21,7 @@ Jev is TypeSafe's System One judgment model, and it **generates no text** — yo
 |---|---|---|
 | Prune tool output | a `read` `grep` `glob` `web_fetch` `web_search` result over 2000 tokens | judges each segment for relevance to the request, drops the irrelevant ones, leaves a visible notice |
 | Screen for injection | the body fetched by `web_fetch` / `web_search` | judges whether it contains instructions aimed at the model, and attaches a notice past the threshold |
-| Skill suggestion | the first prompt assembly of each turn, with a skill catalog of 15 or more | picks at most one skill as a suggestion |
+| Skill suggestion | the first prompt assembly of each turn, with a skill catalog of 15 or more | reads the latest user message (falling back to the last three when it is too short) and picks at most one skill |
 | `jev_ask` | called by the model | any typed question, answered with probabilities |
 | `jev_gate` | called by the model | checks each claim against evidence before "done" is declared |
 
@@ -78,6 +78,8 @@ Get a key at <https://console.typesafe.ai/keys>.
 | — | The **body of a pruned tool result**, plus the current request text |
 | — | Injection screening: the **fetched page body**, plus the current request text |
 | — | Skill suggestion: the current request text, plus skill names and descriptions |
+| — | **`jev_ask`'s `state`**, plus the question text you hand it |
+| — | **`jev_gate`'s `request` / `claims` / `evidence` / `artifact`** |
 
 In one line: **once a key is configured, tool output and fetched pages leave the machine.** Where they go is `baseUrl` (default `api.typesafe.ai`) — point it at a self-hosted or third-party System One host and the right-hand column follows. Every capability can be switched off separately in Settings and takes effect immediately; injection screening is **advisory** — it never blocks a call and never rewrites content.
 
@@ -91,10 +93,10 @@ Editable on the settings page, or in the `config:` block of the bundle row.
 | `apiKeyEnv` | `TYPESAFE_API_KEY` | Environment variable the key is read from |
 | `baseUrl` | `https://api.typesafe.ai` | System One API root, a bare host. Change it for a self-hosted Jev-compatible server, or for a deployment that puts a gateway in front — a hardcoded endpoint sends those requests to the default host. The plugin appends the `/v1/systemone` path |
 | `model` | `jev-latest` | The alias moves with releases; every judgment records the version that answered |
-| `sessionCallLimit` | `200` | Judgment calls per session, all capabilities combined |
+| `sessionCallLimit` | `200` | Judgment calls per session, all capabilities combined, `jev_ask` and `jev_gate` included. The three automatic capabilities also carry a per-turn ceiling |
 | `prune.enabled` | `true` | Enable tool-result pruning |
 | `prune.minTokens` | `2000` | Below this estimated token count, nothing is judged |
-| `prune.perTurnLimit` | `3` | Calls per turn. Measured: uncapped, the worst turn fired 27 times ≈ 8.1 s; capped at 3, the worst is 0.9 s |
+| `prune.perTurnLimit` | `3` | Calls per turn, **shared by prune, screen and suggest** — the name carries `prune.`, but `jev_ask` and `jev_gate` are explicit calls and are not bounded by it. Measured: uncapped, the worst turn fired 27 times ≈ 8.1 s; capped at 3, the worst is 0.9 s |
 | `prune.toolAllowlist` | `read` `grep` `glob` `web_fetch` `web_search` | **`pwsh` is deliberately absent** — the "irrelevant" part of terminal output is often what you need |
 | `prune.minTaskChars` | `12` | Gives up when the request text is too short |
 | `prune.shadow` | `false` | Shadow mode: judge and record as normal, change nothing |
@@ -109,7 +111,7 @@ Editable on the settings page, or in the `config:` block of the bundle row.
 
 ## Troubleshooting
 
-Run **`/jev-status`**: it reports whether the plugin is enabled, where the key came from, which endpoint will be called, how many judgments have run, where the ledger lives, and the reason for **every** skip (`task-too-vague`, `too-small`, `budget-turn`, `no-saving`, `unauthorized`).
+Run **`/jev-status`**: it reports whether the plugin is enabled, where the key came from, which endpoint will be called, how many judgments have run, where the ledger lives, and the reason for **every** skip (`task-too-vague`, `too-small`, `budget-turn`, `no-saving`, `no-skills`, `catalog-too-small`, `unauthorized`).
 
 If the key is missing, or the endpoint is wrong and every call comes back 401, the plugin says so **once in the session** (once per session, per reason). Fail-open means those two failures are reported nowhere else — the session is the only place they are visible, and the notice reaches the **model** as well as you.
 
@@ -150,15 +152,15 @@ npm run measure -- samples.jsonl # labelled ({p, y}) data: accuracy, ECE, Brier,
 
 ## Language
 
-The plugin follows your language in both directions with no configuration: the settings card follows the **DSH interface language**, while in-session notices (pruning, skill suggestions, `/jev-status`, `jev_ask` results) follow the **conversation language**. Detection is deliberately naive — it looks for CJK characters — and guessing wrong costs one extra line of Chinese. Questions sent to Jev are always English, because the official docs say English is the best-trained language.
+The plugin follows your language in both directions with no configuration: the settings card follows the **DSH interface language**, while in-session notices (pruning, skill suggestions, `/jev-status`, `jev_ask` and `jev_gate` results) follow the **conversation language**. Detection is deliberately naive — it looks for CJK characters — and guessing wrong costs one extra line of Chinese. Questions sent to Jev are always English, because the official docs say English is the best-trained language.
 
 ## Development
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 222 tests (node --test, no test framework)
+npm test                         # builds first, then runs 243 tests (node --test, no test framework)
 node scripts/check-tarball.mjs   # asserts the published tarball carries no local state and nothing is missing
-node scripts/release-notes.ts 0.1.7  # preview a version's GitHub Release body (the workflow calls this on release)
+node scripts/release-notes.ts 0.1.8  # preview a version's GitHub Release body (the workflow calls this on release)
 npm run trigger-rate             # trigger rates from local session logs — no key, no network
 npm run measure -- --ledger      # read the local ledger; reports net savings over DSH's own truncation
 ```
@@ -167,7 +169,7 @@ npm run measure -- --ledger      # read the local ledger; reports net savings ov
 - [docs/s0-trigger-rate.md](docs/s0-trigger-rate.md) — the measurements behind every default threshold (72 real sessions, 4653 tool results)
 - [docs/dev-workflow.md](docs/dev-workflow.md) — traps hit while developing a local bundle
 
-After changing `lib/` you **must restart `dsh web`**: toggling the plugin off and on does not re-import ESM modules.
+After changing `lib/` you **must restart `dsh web`**: toggling the plugin off and on does not re-import ESM modules. That holds **only while the profile points at the development directory** — a version-number install is a real copy, so a restart keeps loading the registry one. See [docs/dev-workflow.md](docs/dev-workflow.md) §15 for how to tell which you have.
 
 Pushing to `main` runs CI (ubuntu + windows × node 24: `npm ci` → `npm test` → tarball check). Releases are driven by a tag and take **two steps**: pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against the version in `package.json`, runs the same gates, and **stages** the package on npm through trusted publishing (no long-lived token). Nothing is public at that point: you approve with 2FA (`npm stage approve <stage-id>`, or the Staged Packages tab on npmjs.com) and then turn the **draft Release** the workflow left behind into a published one (`gh release edit vX.Y.Z --draft=false`) — both commands are printed in the run summary. Two steps on purpose: `npm publish` is deliberately left out of the trusted publisher's allowed actions, so a compromised workflow cannot put a package in front of the world by itself — the tag says "release candidate" and the 2FA prompt says "release" (the trusted publisher still has to be configured once on npm, and the steps are in the workflow's header comment). The Release body is that version's section of **both** changelogs, because the two sides are peer texts rather than a translation summary.
 

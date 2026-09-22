@@ -5,9 +5,15 @@
 
 ## 1. 什么改动需要什么级别的重载
 
+> ⚠️ **先决条件：profile 里的 `dsh-jev-tools` 必须指向开发目录。** 下表全部建立在这一点上。
+> 插件发布后按版本号安装时，`profiles/web/node_modules/dsh-jev-tools` 是**真实拷贝**，
+> 于是「改 `src/` → `npm run build` → 重启宿主」这条本来正确的链会**静默失效**：宿主正常启动、
+> 无警告、跑的还是 registry 上那份。**2026-09-22 实测踩到**——一次已经改好的修复因此被
+> 误判为「没生效」，白查了一轮。判断当前是哪一种、以及怎么切成链接，见 **§15**。
+
 | 改动 | 生效方式 | 原因 |
 |---|---|---|
-| host 半边 `lib/*.js` **内容** | **必须重启 `dsh web`** | **关开 bundle 无效**——Node ESM 按 URL 缓存模块，重挂同一路径拿到的是旧模块。见下方警告 |
+| host 半边 `lib/*.js` **内容** | **必须重启 `dsh web`**（且 profile 已 link 到开发目录，见上） | **关开 bundle 无效**——Node ESM 按 URL 缓存模块，重挂同一路径拿到的是旧模块。见下方警告 |
 | `package.json` 里新增/修改 **`dsh.client`** | **必须重启宿主** | 见 §2，`client-modules` 按包名缓存扫描结果 |
 | `client/*.js` **内容**（manifest 不变） | HMR watch 可接 | `client-modules` 有 `artifactBaseline` / `rebuilt()` 的 fs watch |
 | 新增 host 行（patch 里加 row） | `install_bundle`（新 bundle）或重启 | — |
@@ -117,7 +123,9 @@ node scripts/trigger-rate.ts --json trigger-rate.json
 
 ## 8. junction / link 安装的包，裸 import 解析不到 profile 的依赖
 
-profile 里的包是以 **junction** 链到开发目录的（`profiles/web/node_modules/dsh-jev-tools → D:\...\dsh-jev-tools`）。但 **Node 的 ESM 会对被导入模块做 realpath**，所以解析裸标识符的起点是**真实路径**，不是 link 路径：
+**这一节只在链接形态下成立。** profile 的 `package.json` 把本包写成 `link:…` 时（见 §15），
+`node_modules/dsh-jev-tools` 是以 **junction** 链到开发目录的；按版本号安装时它是真实拷贝，
+下面这件事不会发生。链接形态下 **Node 的 ESM 会对被导入模块做 realpath**，所以解析裸标识符的起点是**真实路径**，不是 link 路径：
 
 ```
 import.meta.url → file:///D:/projects/.../dsh-jev-tools/.probe/probe.mjs   ← 已经是真实路径
@@ -268,5 +276,94 @@ gh release edit v0.1.8 --draft=false      # 把 workflow 留下的草稿 Release
 - **`npm stage` 需要 npm >= 11.15.0**（trusted publishing 只要 >= 11.5.1）。所以 workflow 里装的是 `npm@^11.15.0` 而**不是** `@latest`：npm 12 的 engines 是 `^22.22.2 || ^24.15.0 || >=26.0.0`，而 runner 的 Node 24 比 24.15 旧——装上去只会得到 EBADENGINE 警告，并在一个它声明不支持的 Node 上跑（0.1.7 那次就是这么跑的，侥幸没炸）。
 - **批准必须有 2FA**，CLI 与网页都一样：这是 proof-of-presence 步骤。账号没启用 2FA 就做不了（staged publishing 的前置条件之一）。
 - **`list` / `view` / `approve` / `reject` 不能用 OIDC**，只能在本地交互式执行。所以 workflow 能做的只有 stage，剩下的一定是人。
+
+## 15. 让宿主跑你的开发版：先判断当前是拷贝还是链接
+
+**为什么单独写**：§1 里所有重载手段都建立在「profile 指向开发目录」之上，而这**不是一个会自动成立的
+前提**。插件一旦发布，按版本号安装装的是**真实拷贝**，「改代码 → 构建 → 重启」这条链就静默失效了：
+宿主照常启动、`applied` 正常、日志里一句警告都没有，跑的还是 registry 上那份。
+2026-09-22 实测因此把一个**已经改好的修复**误判为「没生效」，白查了一轮。
+
+### 判断
+
+```powershell
+$p = "C:\Users\Horus\.dsh\profiles\web\node_modules\dsh-jev-tools"
+(Get-Item $p -Force).LinkType        # 'Junction' 且 Target 指向开发目录才是链接；空 = 真实拷贝
+
+# 最可靠的一条：比哈希。两侧不一致，就说明宿主跑的不是你的产物
+Get-FileHash "$p\lib\features\skill-suggest.js"
+Get-FileHash "<开发目录>\lib\features\skill-suggest.js"
+```
+
+顺带一条：**`lib/` 必须比 `src/` 新**，否则拿到的是过期产物。
+
+### 为什么不能直接 `pnpm add`
+
+`dsh plugin --profile web add <开发目录>`（等于在 profile 目录跑 `pnpm add`）**在这台机器上走不通**：
+它先做锁定文件的供应链校验，而 profile 的 `minimumReleaseAge` 策略会拦下 **lockfile 里已经存在**的
+若干条目——2026-09-22 实测被拒的是 `dsh-context@0.54.4`、`dsh-map-tools@0.7.0`、`dshmarket@1.55.0`
+（都因发布日期太新），报 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`。**注意被拦的不是你要装的那个包**，
+所以那条报错信息很容易把人带偏。
+
+**不要**为它放松策略，也**不要**跑 `pnpm clean --lockfile`——后者会重解整棵依赖，动到的远不止本插件。
+手工链接完全等价，而且离线。
+
+### 切成链接
+
+```powershell
+$prof = "C:\Users\Horus\.dsh\profiles\web"
+$dev  = "D:\projects\DSH\DSH代码学习\04-插件\dsh-jev-tools"
+
+# 1) 把 registry 拷贝移到 node_modules 之外备份（§13：Node 的 rmSync 在这台机器上静默失败，用 PowerShell）
+Move-Item "$prof\node_modules\dsh-jev-tools" "$prof\.backup-dsh-jev-tools-registry" -Force
+
+# 2) 建 junction
+New-Item -ItemType Junction -Path "$prof\node_modules\dsh-jev-tools" -Target $dev | Out-Null
+```
+
+```jsonc
+// 3) profile 的 package.json：spec 也要改，否则将来一次 pnpm install 会把 registry 版装回来盖掉链接
+"dsh-jev-tools": "link:D:/projects/DSH/DSH代码学习/04-插件/dsh-jev-tools"
+```
+
+然后**重启 `dsh web`**（§1），并回到上面「判断」一节复核哈希两侧一致。
+`dsh.profile.bundles` 里那一行**不用动**——链接与否都挂在这一行上。
+
+### 回退
+
+删掉 junction → 把备份移回 `node_modules\dsh-jev-tools` → 把 spec 改回版本号。三步都可用 PowerShell 完成。
+
+### 一个副作用
+
+链接之后宿主跑的是**未发布的开发版**：单元测试全绿不等于在真实宿主里验证过。
+要区分「已验证」和「只是测试通过」，看宿主里的实际行为（例如 `Tool.listTools` 里有没有新注册的工具，
+或台账里有没有只有新代码才会写出的记录），不要相信 `applied`。
+
+## 16. 复现 `suggest` 的判断时，criteria 必须用目录里的真实描述
+
+**踩过一次，代价是一个被证伪的结论进了代码注释，并据此改了行为。**
+
+`suggest` 送出的每个候选是 `skill.description.slice(0, 200)`——**目录里的真实描述**。
+若用 `jev_ask` 复现它的判断，却按自己的理解把描述缩写一遍，那你改掉的不只是任务文本，
+**criteria 也一起换了**。两个变量同时动，得出的差异会被归因到错的那一个。
+
+实测（2026-09-22，同一句话、同一批 29 个技能）：
+
+| criteria | 任务文本 | top1 | 次席 | tokens |
+|---|---|---|---|---|
+| 自写缩写 | 单条长请求 | `lark-workflow-meeting-summary` 0.45 | `lark-minutes` 0.39 | 1606 |
+| 自写缩写 | 三条窗口 | `lark-workflow-meeting-summary` 0.47 | `lark-minutes` 0.40 | 1606 |
+| **真实描述** | 单条长请求 | **`lark-minutes` 0.510** | `lark-workflow-meeting-summary` 0.270 | 3544 |
+| **真实描述** | 三条窗口 | **`lark-minutes` 0.470** | `lark-workflow-meeting-summary` 0.310 | 3608 |
+
+真实描述下，两种任务文本**冠军相同**：窗口只稀释信号（0.510 → 0.470，top2 边际 0.24 → 0.16），
+并不翻盘。此前那句「窗口翻了冠军」是错的，冠军差异来自我自写的 criteria。
+
+**规则**：复现 `suggest` 的判断，criteria 逐字取目录描述。`inputTokens` 是最快的自检——
+真实描述约 **3500~4200**，缩写版只有 **1600**，差一倍以上就说明 criteria 被换过了。
+
+**顺带一条**：`jev_ask` 和 `suggest` 是两个不同的调用方，但问的是同一类问题。
+拿 `jev_ask` 复现 `suggest` 是合法手段，前提是输入逐字一致；否则它证明不了 `suggest` 的行为。
+
 
 

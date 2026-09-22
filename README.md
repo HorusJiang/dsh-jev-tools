@@ -21,7 +21,7 @@ Jev 是 TypeSafe 的 System One 判定模型，**不生成文本**——它针�
 |---|---|---|
 | 精简工具输出 | `read` `grep` `glob` `web_fetch` `web_search` 的结果超过 2000 tokens | 逐段判定与当前任务的相关性，丢掉不相关的段落，留一条可见提示 |
 | 注入筛查 | `web_fetch` / `web_search` 抓回的正文 | 判定其中有没有针对 AI 的指令，越过阈值时附一条提醒 |
-| 技能推荐 | 每轮首次组装 prompt，且技能目录 ≥ 15 个 | 选出至多一个最匹配的 skill 作为建议 |
+| 技能推荐 | 每轮首次组装 prompt，且技能目录 ≥ 15 个 | 按最新一条用户消息（过短时回退到最近三条），选出至多一个最匹配的 skill |
 | `jev_ask` | 模型主动调用 | 任意带类型的问题，直接拿回带概率的答案 |
 | `jev_gate` | 模型主动调用 | 宣布「做完」之前，逐条核对声明有没有证据支持 |
 
@@ -78,6 +78,8 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 | — | **被精简的工具输出正文**，以及当前任务文本 |
 | — | 注入筛查：**抓取到的页面正文**，以及当前任务文本 |
 | — | 技能推荐：当前任务文本，以及技能目录的名称与描述 |
+| — | **`jev_ask` 的 `state`**，以及你交给它的问题文本 |
+| — | **`jev_gate` 的 `request` / `claims` / `evidence` / `artifact`** |
 
 一句话：**启用后，工具输出与抓取到的页面会离开本机。** 目的地由 `baseUrl` 决定（默认 `api.typesafe.ai`）——把它指向自建或第三方 System One 主机，右边一列的目的地就随之改变。每项能力都可在设置页分别关闭，关闭立即生效；注入筛查**只提醒**，绝不拦截调用、绝不改写内容。
 
@@ -91,10 +93,10 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 | `apiKeyEnv` | `TYPESAFE_API_KEY` | 读取 key 的环境变量名 |
 | `baseUrl` | `https://api.typesafe.ai` | System One 判定端点，填裸主机名。自建的 Jev 兼容服务、或在前面挡了一层网关的部署都要改这里——端点写死会让这些部署的请求发去默认主机。路径 `/v1/systemone` 由插件追加 |
 | `model` | `jev-latest` | 别名会随版本移动；每次判定都记录实际作答版本 |
-| `sessionCallLimit` | `200` | 每会话判定次数上限（所有能力合计） |
+| `sessionCallLimit` | `200` | 每会话判定次数上限（所有能力合计，含 `jev_ask` / `jev_gate`）。三个自动能力另有每 turn 上限 |
 | `prune.enabled` | `true` | 启用工具结果精简 |
 | `prune.minTokens` | `2000` | 低于此估算 token 数不做判定 |
-| `prune.perTurnLimit` | `3` | 每 turn 判定上限。实测：不限时最坏一个 turn 触发 27 次 ≈ 8.1 秒，限 3 次后最坏 0.9 秒 |
+| `prune.perTurnLimit` | `3` | 每 turn 判定上限，**prune / screen / suggest 三者共享**——名字带 `prune.`，但 `jev_ask` / `jev_gate` 是显式调用、不受它限制。实测：不限时最坏一个 turn 触发 27 次 ≈ 8.1 秒，限 3 次后最坏 0.9 秒 |
 | `prune.toolAllowlist` | `read` `grep` `glob` `web_fetch` `web_search` | **刻意不含 `pwsh`**——终端输出里的「无关」内容往往正是排查所需 |
 | `prune.minTaskChars` | `12` | 当前任务文本过短时放弃 |
 | `prune.shadow` | `false` | 试运行：照常判定与记账，但不改动任何内容 |
@@ -109,7 +111,7 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 
 ## 排查
 
-敲 **`/jev-status`**：显示启用状态、key 来源、判定端点、判定次数、台账存放位置，以及每一次跳过的原因（`task-too-vague`、`too-small`、`budget-turn`、`no-saving`、`unauthorized`）。
+敲 **`/jev-status`**：显示启用状态、key 来源、判定端点、判定次数、台账存放位置，以及每一次跳过的原因（`task-too-vague`、`too-small`、`budget-turn`、`no-saving`、`no-skills`、`catalog-too-small`、`unauthorized`）。
 
 如果 key 没配好、或端点填错导致 401，插件会**在会话里说一次**（每个会话、每种原因各一次）。fail-open 的意义是判定失败不影响任务，代价是这两类失败在别处都不报错——会话是唯一能看见它们的地方，而这条提示同时到达你**和模型**。
 
@@ -150,15 +152,15 @@ npm run measure -- samples.jsonl # 有标注（{p, y}）的数据：准确率、
 
 ## 语言
 
-插件双向跟随语言，不需要配置：设置卡片跟 **DSH 界面语言**，会话提示（精简提示、技能建议、`/jev-status`、`jev_ask` 结果）跟**对话语言**。判定很朴素（看是否含中日韩字符），猜错也就是多一行中文。发给 Jev 的问题固定用英文——官方文档说明英语是主训练语言。
+插件双向跟随语言，不需要配置：设置卡片跟 **DSH 界面语言**，会话提示（精简提示、技能建议、`/jev-status`、`jev_ask` 与 `jev_gate` 的结果）跟**对话语言**。判定很朴素（看是否含中日韩字符），猜错也就是多一行中文。发给 Jev 的问题固定用英文——官方文档说明英语是主训练语言。
 
 ## 开发
 
 ```bash
 npm install --cache .npm-cache   # 依赖极少
-npm test                         # 先构建，再跑 222 个测试（node --test，无测试框架依赖）
+npm test                         # 先构建，再跑 243 个测试（node --test，无测试框架依赖）
 node scripts/check-tarball.mjs   # 断言发布包里既没有本机状态、也不缺该有的文件（CI 与发布前都跑）
-node scripts/release-notes.ts 0.1.7  # 预览某个版本的 GitHub Release 正文（发布时由 workflow 调用）
+node scripts/release-notes.ts 0.1.8  # 预览某个版本的 GitHub Release 正文（发布时由 workflow 调用）
 npm run trigger-rate             # 从本地会话日志统计触发率，无需 key、无网络
 npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH 自带截断的净增量
 ```
@@ -167,7 +169,7 @@ npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH �
 - [docs/s0-trigger-rate.md](docs/s0-trigger-rate.md) —— 全部默认阈值的实测依据（72 个真实会话、4653 条真实工具结果）
 - [docs/dev-workflow.md](docs/dev-workflow.md) —— 本地 bundle 开发踩过的坑
 
-改了 `lib/` 之后**必须重启 `dsh web`**：关开插件开关不会重新导入 ESM 模块。
+改了 `lib/` 之后**必须重启 `dsh web`**：关开插件开关不会重新导入 ESM 模块。但这**只在 profile 指向开发目录时成立**——按版本号安装时装的是真实拷贝，重启加载的仍是 registry 那份。判断当前是哪一种，见 [docs/dev-workflow.md](docs/dev-workflow.md) §15。
 
 推送到 `main` 会自动跑 CI（ubuntu + windows × node 24：`npm ci` → `npm test` → tarball 检查）。发布靠打 tag，而且是**两步**：推一个 `v*` tag 会走 `.github/workflows/release.yml`——先校验 tag 与 `package.json` 的版本一致，再跑同一套门禁，然后经 npm trusted publishing 把包 **stage 到暂存区**（无长期 token）。此时**什么都还没公开**：你带 2FA 执行 `npm stage approve <stage-id>`（或在 npmjs.com 的 Staged Packages 页点 Approve），再把 workflow 留下的**草稿 Release** 转正（`gh release edit vX.Y.Z --draft=false`）——这两条命令会打印在运行摘要里。之所以要两步：trusted publisher 的 Allowed actions 刻意**不勾** `npm publish`，于是一个被攻陷的 workflow 无法自己把包推给全世界；tag 表示"这是候选"，2FA 那一下才表示"这是发布"（首次仍需在 npm 侧配置一次 trusted publisher，workflow 头部注释里有逐字步骤）。Release 正文取自 CHANGELOG 里该版本的**两种语言正文**，因为两边是对等正文而非译文摘要。
 

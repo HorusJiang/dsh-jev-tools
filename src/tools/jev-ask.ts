@@ -74,13 +74,28 @@ function describe (id: string, answer: Answer, lang: Lang): string {
  * @returns the definition to register.
  */
 export function createJevAskTool (deps: JevAskDeps): ToolDefinitionLike {
-  /** Record a declined call so `/jev-status` can explain it later. */
-  const declined = (problem: SkipReason, detail: string, lang: Lang): Record<string, unknown> => {
+  /**
+   * Record a declined call so `/jev-status` can explain it later — and so the
+   * conversation sees *why*.
+   *
+   * `report` is set here on purpose: the renderer reads only `report`, so a
+   * decline that carried just `message`/`detail` displayed as the opaque
+   * `(no judgment)`. A missing key, an invalid request and an exhausted quota
+   * were then indistinguishable in the one place the README says these failures
+   * are visible.
+   */
+  const declined = (
+    problem: SkipReason,
+    detail: string,
+    lang: Lang,
+    agentId: string
+  ): Record<string, unknown> => {
+    const message = skipMessage(problem, lang)
     deps.ledger.record({
-      ts: deps.now(), agentId: '', feature: 'tool', backendId: 'jev', model: '',
+      ts: deps.now(), agentId, feature: 'tool', backendId: 'jev', model: '',
       latencyMs: 0, outcome: 'skipped', skip: problem,
     })
-    return { ok: false, problem, message: skipMessage(problem, lang), detail }
+    return { ok: false, problem, message, detail, report: `${message}\n${detail}` }
   }
 
   return {
@@ -140,12 +155,13 @@ export function createJevAskTool (deps: JevAskDeps): ToolDefinitionLike {
       const lang = detectLang(deps.cache.task(agentId))
 
       if (!settings.enabled) {
-        return declined('disabled', 'The plugin master switch is off.', lang)
+        return declined('disabled', 'The plugin master switch is off.', lang, agentId)
       }
 
       const questions = args.questions
       if (questions === null || typeof questions !== 'object' || Array.isArray(questions)) {
-        return declined('invalid-request', '`questions` must be an object: question id to question.', lang)
+        return declined('invalid-request', '`questions` must be an object: question id to question.',
+          lang, agentId)
       }
       const request: JudgmentRequest = {
         state: (args.state ?? '') as JudgmentRequest['state'],
@@ -157,20 +173,24 @@ export function createJevAskTool (deps: JevAskDeps): ToolDefinitionLike {
       // before the content leaves the machine.
       const violations = validateRequest(request)
       if (violations.length > 0) {
-        return declined('invalid-request', violations.map(v => v.detail).join('; '), lang)
+        return declined('invalid-request', violations.map(v => v.detail).join('; '), lang, agentId)
       }
 
-      const grant = deps.budget.tryConsume(agentId, -1)
+      const grant = deps.budget.tryConsumeSession(agentId)
       if (!grant.ok) {
+        // `tryConsumeSession` can only refuse on the session ceiling, so the
+        // detail now names the ceiling that actually stopped it. The old text
+        // claimed the session allowance while the check was a per-turn one.
         return declined(grant.reason,
-          `This session allows at most ${settings.sessionCallLimit} judgments; raise it in settings.`,
-          lang)
+          `This session allows at most ${settings.sessionCallLimit} judgments, shared with automatic `
+          + 'pruning and screening; raise the limit in the plugin settings.',
+          lang, agentId)
       }
 
       const apiKey = await resolveApiKey(deps.credentials(), settings.apiKeyEnv)
       if (!apiKey.ok) {
         return {
-          ...declined('no-key', `Could not resolve a key from ${settings.apiKeyEnv}.`, lang),
+          ...declined('no-key', `Could not resolve a key from ${settings.apiKeyEnv}.`, lang, agentId),
           hint: `Create an API key at ${TYPESAFE_KEYS_URL} and paste it into the plugin settings page, `
             + `or set the environment variable ${settings.apiKeyEnv}.`,
         }
@@ -184,7 +204,7 @@ export function createJevAskTool (deps: JevAskDeps): ToolDefinitionLike {
       } catch (error) {
         const problem = error instanceof JevError ? error.problem : 'unknown'
         const detail = error instanceof Error ? error.message : String(error)
-        return declined(problem as SkipReason, detail, lang)
+        return declined(problem as SkipReason, detail, lang, agentId)
       }
 
       deps.ledger.record({

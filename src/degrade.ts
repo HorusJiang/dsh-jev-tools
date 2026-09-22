@@ -24,6 +24,9 @@ export type SkipReason =
   | 'no-task' // the current request is unknown, so relevance cannot be judged
   | 'task-too-vague' // the request is known but carries no usable signal
   | 'no-saving' // pruning would not have saved enough to be worth the distortion
+  | 'no-skills' // the skill registry is not visible to this plugin
+  | 'catalog-unavailable' // reading the skill catalog failed
+  | 'catalog-too-small' // the catalog is below the size floor for a suggestion
   | 'shadow' // judged, but shadow mode left the payload untouched on purpose
   | 'empty' // nothing judgeable in the payload
   | 'aborted' // the caller cancelled

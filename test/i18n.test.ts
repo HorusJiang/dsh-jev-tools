@@ -64,7 +64,10 @@ test('an unknown key renders as itself rather than throwing', () => {
 })
 
 test('every skip reason has wording in both languages', () => {
-  for (const reason of ['disabled', 'no-key', 'too-small', 'no-task', 'task-too-vague', 'budget-turn'] as const) {
+  for (const reason of [
+    'disabled', 'no-key', 'too-small', 'no-task', 'task-too-vague', 'budget-turn',
+    'no-skills', 'catalog-unavailable', 'catalog-too-small',
+  ] as const) {
     for (const lang of ['zh', 'en'] as const) {
       const text = skipMessage(reason, lang)
       assert.notEqual(text, `skip.${reason}`, `${reason} is missing from the ${lang} catalog`)

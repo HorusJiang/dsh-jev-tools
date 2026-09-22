@@ -132,9 +132,25 @@ export interface SkillSummaryLike {
   readonly description: string
 }
 
+/**
+ * How a catalog read is scoped.
+ *
+ * `scope` is the viewing agent. The registry merges the global layer with that
+ * scope's chain, and **an omitted `scope` reads the global layer alone** — which
+ * is not the catalog the session actually has, because an agent preset's
+ * standing composition registers into that preset's layer rather than globally.
+ * A consumer that wants the session's real catalog must pass the agent; the
+ * host's own `tool-skill` does exactly that.
+ */
+export interface SkillViewOptionsLike {
+  readonly scope?: unknown
+  readonly cwd?: string | undefined
+  readonly signal?: AbortSignal | undefined
+}
+
 /** `ctx.skills` — the layered skill registry. */
 export interface SkillsService {
-  list (options?: unknown): Promise<readonly SkillSummaryLike[]>
+  list (options?: SkillViewOptionsLike): Promise<readonly SkillSummaryLike[]>
 }
 
 /**
@@ -215,9 +231,16 @@ export interface ServiceScope {
   [service: string]: unknown
 }
 
-/** An agent reference: only its identity is ever exposed. */
+/**
+ * An agent reference.
+ *
+ * Only `id` is relied on for identity. `session.header.cwd` is declared because
+ * the skill catalog is read per workspace and that is where the host keeps it —
+ * the host's own `tool-skill` reads the same path.
+ */
 export interface AgentLike {
   readonly id: string
+  readonly session?: { readonly header?: { readonly cwd?: string } }
 }
 
 /** The tool call a post-execute listener sees. */

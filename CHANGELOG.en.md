@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.8` | 2026-09-22 | **pending** | Skill suggestion had **never fired**, now fixed; the two tools' quota and refusal reasons are no longer dead or silent. |
 | `0.1.7` | 2026-09-22 | **published** | Structural failures are no longer silent; cost is visible; calibration gains AUC and a threshold sweep; CI and tag-driven releases. |
 | `0.1.6` | 2026-09-22 | **published** | The judgment endpoint is configurable (`baseUrl`); `/jev-status` reports it. |
 | `0.1.5` | 2026-09-21 | **published** | Fixes the Workshop manifest's adapter field; the capabilities are the same as `0.1.4`. |
@@ -21,6 +22,62 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.8] — 2026-09-22
+
+### Fixed
+
+- **Skill suggestion had never fired.** The only defect here where **a whole capability did nothing and
+  nothing outside could tell.** `skills.list()` passed no `scope`, and the registry reads the **global
+  layer alone** when `scope` is omitted — while a plugin mounted by an agent preset registers into that
+  **preset's layer**. A session holding twenty-odd skills was therefore invisible to the plugin, the
+  catalog stayed under the 15 floor, and every turn returned silently. Evidence: before the fix,
+  **227 ledger rows across 6 sessions contained not one `suggest` row**, against 218 for `prune` and 9
+  for `screen`; after it, the first `judged` row appeared and a suggestion reached the session.
+- **`jev_ask` / `jev_gate` could be called three times per session.** Both called
+  `budget.tryConsume(agentId, -1)`: `-1` is a **pseudo-turn that never advances**, and the ceiling passed
+  in is `prune.perTurnLimit` — a per-turn value — so `turns.get(-1)` only ever grew. The fourth call
+  onwards was refused **permanently**. Measured: three successes, then three `skip: "budget-turn"` rows.
+  Explicit calls now take a separate `tryConsumeSession()` bounded only by `sessionCallLimit`: the
+  per-turn ceiling exists to bound the latency an **automatic** capability adds, which has no rationale
+  for a call that is asking for one answer.
+- **A refusal reached the session as a placeholder.** The renderer reads only `report`, and `declined()`
+  returned `{ problem, message, detail }` without it — so a missing key, an invalid request, an exhausted
+  quota and a network failure were indistinguishable in the session: `(no judgment)` (and
+  `(no gate verdict)` for the gate). That contradicts what the README promises — the price of fail-open
+  is that these failures are visible **only** in the session.
+- **Refusal rows lost the session id.** The failure path hardcoded `agentId: ''` while the success path
+  recorded the real one, so half of a tool's ledger could not be attributed.
+- **The refusal text named the wrong ceiling.** It claimed "this session allows at most 200", while the
+  check actually performed was the per-turn one. The text now describes the ceiling that stopped it.
+- **An abstention re-judged on every later step of the same turn.** The turn was latched only once a
+  notice was actually produced, so an abstention — the normal outcome on a vague turn — latched nothing
+  and every subsequent step re-sent the judgment. Measured: **three user turns produced four judgment
+  rows**, each spending the per-turn allowance `prune` shares. The latch is now set before the request
+  goes out, and the latch hit writes no row: **one `suggest` row per turn** is the invariant.
+
+### Added
+
+- **Every skill-suggestion decline is now recorded.** Three skip reasons are added: `no-skills`,
+  `catalog-unavailable`, `catalog-too-small`. Until now all eight early returns were silent, so "never
+  ran" and "ran and declined every time" were **indistinguishable from outside** — the one question the
+  ledger exists to answer. Rows are deduplicated by (turn, reason): `agent/pre-step` fires on every step,
+  and without that the same line would flush the 1000-row ledger window.
+- **Skill suggestion now judges the latest user message** (falling back to the last three when it is too
+  short). That is a **semantic** choice, not an accuracy gain: a suggestion answers "what is being asked
+  now", while a three-message window answers "what is this session doing" — pruning's question. A
+  controlled rerun (same criteria, only the task text changed) showed the window merely **diluting** the
+  distribution: winner 0.510 → 0.470, top-two margin 0.24 → 0.16, **winner unchanged**.
+
+### Changed
+
+- The README's quota wording is now accurate: `sessionCallLimit` names both tools, and
+  `prune.perTurnLimit` says it is **shared by prune, screen and suggest**. The data-boundary table gains
+  `jev_ask` and `jev_gate` — both send caller-supplied text off the machine, and the section had omitted
+  them.
+- The poster and its render script moved out of `docs/` (to `poster/` at the repository root): the
+  `files` allowlist covers all of `docs/`, and 3 MB of marketing artwork has no reason to reach every
+  `npm i`.
 
 ## [0.1.7] — 2026-09-22
 

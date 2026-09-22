@@ -26,6 +26,14 @@ export interface ContextCache {
   /** Read the request text for one agent, or `undefined` when unknown. */
   task (agentId: string): string | undefined
   /**
+   * Read only the most recent request message for one agent.
+   *
+   * `task` answers "what is this session working on" — pruning's question. Skill
+   * suggestion needs "what is being asked right now", so it reads the latest
+   * message whenever that message is substantive enough to stand alone.
+   */
+  latest (agentId: string): string | undefined
+  /**
    * Record the turn an agent is on.
    *
    * `ToolExecution` carries no turn number, but `agent/pre-step` and
@@ -81,6 +89,14 @@ export function createContextCache (maxAgents = 64): ContextCache {
       // follow-ups that refine it. Truncated from the front when long.
       const joined = history.join('\n')
       return joined.length > MAX_LENGTH ? joined.slice(joined.length - MAX_LENGTH) : joined
+    },
+    latest (agentId) {
+      const history = byAgent.get(agentId)
+      const last = history?.[history.length - 1]
+      if (last === undefined) return undefined
+      // Same cap as `task`, for the same reason: one pasted document is not a
+      // request, and a judgment request has its own size ceiling.
+      return last.length > MAX_LENGTH ? last.slice(last.length - MAX_LENGTH) : last
     },
     rememberTurn (agentId, turn) {
       if (!Number.isFinite(turn)) return
