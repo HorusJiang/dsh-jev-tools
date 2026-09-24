@@ -11,8 +11,8 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
-| `0.1.10` | 2026-09-25 | **pending** | The ledger records baseline coverage; a net gain is no longer reported without a measured baseline. |
-| `0.1.9` | 2026-09-25 | **pending** | An injected notice used to fail the whole turn; the source kind now names its producer, as format v4 requires. |
+| `0.1.10` | 2026-09-25 | **published** | The ledger records baseline coverage; a net gain is no longer reported without a measured baseline. |
+| `0.1.9` | 2026-09-25 | **published** | An injected notice used to fail the whole turn; the source kind now names its producer, as format v4 requires. |
 | `0.1.8` | 2026-09-22 | **published** | Skill suggestion had **never fired**, now fixed; the two tools' quota and refusal reasons are no longer dead or silent. |
 | `0.1.7` | 2026-09-22 | **published** | Structural failures are no longer silent; cost is visible; calibration gains AUC and a threshold sweep; CI and tag-driven releases. |
 | `0.1.6` | 2026-09-22 | **published** | The judgment endpoint is configurable (`baseUrl`); `/jev-status` reports it. |
