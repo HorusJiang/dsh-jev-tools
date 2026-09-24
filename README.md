@@ -174,7 +174,7 @@ npm run measure -- samples.jsonl # 有标注（{p, y}）的数据：准确率、
 
 ```bash
 npm install --cache .npm-cache   # 依赖极少
-npm test                         # 先构建，再跑 243 个测试（node --test，无测试框架依赖）
+npm test                         # 先构建，再跑 246 个测试（node --test，无测试框架依赖）
 node scripts/check-tarball.mjs   # 断言发布包里既没有本机状态、也不缺该有的文件（CI 与发布前都跑）
 node scripts/release-notes.ts 0.1.8  # 预览某个版本的 GitHub Release 正文（发布时由 workflow 调用）
 npm run trigger-rate             # 从本地会话日志统计触发率，无需 key、无网络

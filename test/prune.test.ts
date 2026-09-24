@@ -255,8 +255,9 @@ test('an oversized result is pruned, a notice is attached, and non-text blocks s
   assert.ok(blocks.some(b => b.type === 'image'), 'an image block must be carried through')
   assert.equal(blocks.filter(b => b.type === 'text').length, 1, 'text blocks collapse into one')
 
-  const contexts = decision.additionalContexts as { source?: { form?: string, summary?: string } }[]
+  const contexts = decision.additionalContexts as { source?: { kind?: string, form?: string, summary?: string } }[]
   assert.equal(contexts?.length, 1)
+  assert.equal(contexts[0]?.source?.kind, 'plugin:dsh-jev-tools')
   assert.equal(contexts[0]?.source?.form, 'notice')
   assert.match(contexts[0]?.source?.summary ?? '', /→/)
 
@@ -331,7 +332,11 @@ test('shadow mode reports what it would have done and changes nothing', async ()
   if (decision.kind !== 'accept') return
   assert.deepEqual(decision.content, content, 'shadow mode must not touch the content')
 
-  const notice = decision.additionalContexts?.[0] as { source?: { summary?: string }, content?: { text: string }[] }
+  const notice = decision.additionalContexts?.[0] as {
+    source?: { kind?: string, summary?: string },
+    content?: { text: string }[],
+  }
+  assert.equal(notice?.source?.kind, 'plugin:dsh-jev-tools')
   assert.match(String(notice?.source?.summary), /^shadow · /)
   assert.match(String(notice?.content?.[0]?.text), /shadow mode/i)
 

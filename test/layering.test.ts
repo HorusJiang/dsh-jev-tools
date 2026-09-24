@@ -46,6 +46,7 @@ const LAYERS: Record<string, number> = {
   http: 0,
   i18n: 0,
   memo: 0,
+  source: 0,
   tokens: 0,
 
   // 1 — phrasing, credentials, request building, settings wiring, screening

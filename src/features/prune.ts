@@ -51,9 +51,7 @@ import type {
 } from '../host.js'
 import { resolveApiKey } from '../credentials.js'
 import { fingerprint } from '../memo.js'
-
-/** Plugin identity used in the injected notice's source. */
-const PLUGIN_ID = 'dsh-jev-tools'
+import { noticeSource } from '../source.js'
 
 /** Approximate token ceiling for one judged segment. */
 const CHUNK_TOKENS = 400
@@ -292,7 +290,7 @@ function notice (
     id,
     role: 'user',
     content: [{ type: 'text', text: t(lang, 'prune.notice', { summary }) }],
-    source: { kind: 'plugin', plugin: PLUGIN_ID, form: 'notice', summary },
+    source: noticeSource(summary),
   }
 }
 
@@ -317,7 +315,7 @@ function shadowNotice (
     id,
     role: 'user',
     content: [{ type: 'text', text: t(lang, 'prune.shadowNotice', { summary }) }],
-    source: { kind: 'plugin', plugin: PLUGIN_ID, form: 'notice', summary: `shadow · ${summary}` },
+    source: noticeSource(`shadow · ${summary}`),
   }
 }
 

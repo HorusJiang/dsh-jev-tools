@@ -31,9 +31,7 @@ import { detectLang, t, type MessageKey } from './i18n.js'
 import type { JevSettings } from './config.js'
 import type { ContextCache } from './context-cache.js'
 import type { PreStepDecision, PreStepListener } from './host.js'
-
-/** Plugin identity used in the injected notice's source. */
-const PLUGIN_ID = 'dsh-jev-tools'
+import { noticeSource } from './source.js'
 
 /**
  * The reasons worth interrupting a session for.
@@ -163,7 +161,7 @@ export function createDegradeNoticeListener (deps: DegradeNoticeDeps): PreStepLi
       id: deps.newMessageId(),
       role: 'user',
       content: [{ type: 'text', text: t(lang, `notice.${reason}` as MessageKey, params) }],
-      source: { kind: 'plugin', plugin: PLUGIN_ID, form: 'notice', summary: reason },
+      source: noticeSource(reason),
     }
 
     // Append only: the delegated messages are spread back, so this can never

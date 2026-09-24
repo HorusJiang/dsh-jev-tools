@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.9` | 2026-09-25 | **pending** | An injected notice used to fail the whole turn; the source kind now names its producer, as format v4 requires. |
 | `0.1.8` | 2026-09-22 | **published** | Skill suggestion had **never fired**, now fixed; the two tools' quota and refusal reasons are no longer dead or silent. |
 | `0.1.7` | 2026-09-22 | **published** | Structural failures are no longer silent; cost is visible; calibration gains AUC and a threshold sweep; CI and tag-driven releases. |
 | `0.1.6` | 2026-09-22 | **published** | The judgment endpoint is configurable (`baseUrl`); `/jev-status` reports it. |
@@ -22,6 +23,28 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.9] — 2026-09-25
+
+### Fixed
+
+- **An injected notice failed the whole turn.** Since 0.1.7 the harness writes sessions in format
+  v4, which has **no shared `plugin` source kind**: each message states **who** produced it, and the
+  retired `{ kind: 'plugin', plugin: … }` wrapper is refused by the writer — it does not drop that
+  one message, it ends the turn with `format v4 message requires a producer-owned source kind`
+  ("this turn failed" in the UI). All four notice lines hit it: `prune`, `screen`, `suggest`, and
+  the degrade notice. Evidence: on 2026-09-24 two sessions stopped mid-step at the exact moment a
+  notice was injected — `f87f8e58` at its prune judgment (23:55:53, 5376 → 3187 tokens) and
+  `5f45b2e2` at its screen judgment (23:56:51) — the log ends on `tool/call` with no `turn/end`;
+  reproducing it with the harness 0.1.7-rc.1 `assertV4MessageSources`: `kind: 'plugin'` throws,
+  `kind: 'plugin:dsh-jev-tools'` passes.
+
+### Changed
+
+- **One module owns the notice source.** `src/source.ts` builds it for every capability, and the
+  kind it writes — `plugin:dsh-jev-tools` — is the identity the harness's own v3→v4 migration
+  records for this plugin's historical notices, so notices written before the upgrade and notices
+  written today stay under one kind instead of splitting in two.
 
 ## [0.1.8] — 2026-09-22
 

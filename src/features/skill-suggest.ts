@@ -47,9 +47,7 @@ import type { DegradeNotices } from '../notify.js'
 import type {
   CredentialsService, PreStepDecision, PreStepListener, SkillsService,
 } from '../host.js'
-
-/** Plugin identity used in the injected notice's source. */
-const PLUGIN_ID = 'dsh-jev-tools'
+import { noticeSource } from '../source.js'
 
 /** Option name used to let the model decline. */
 const ABSTAIN = 'none'
@@ -317,7 +315,7 @@ export function createSkillSuggestListener (deps: SkillSuggestDeps): PreStepList
       id: deps.newMessageId(),
       role: 'user',
       content: [{ type: 'text', text: t(lang, 'suggest.notice', { summary }) }],
-      source: { kind: 'plugin', plugin: PLUGIN_ID, form: 'notice', summary },
+      source: noticeSource(summary),
     }
 
     // Append only. Spreading the delegated messages is what keeps this from

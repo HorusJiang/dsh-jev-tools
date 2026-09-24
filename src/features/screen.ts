@@ -41,9 +41,7 @@
 import { t, type Lang } from '../i18n.js'
 import type { Answer, Question } from '../backends/types.js'
 import type { JevSettings } from '../config.js'
-
-/** Plugin identity used in the injected notice's source. */
-const PLUGIN_ID = 'dsh-jev-tools'
+import { noticeSource } from '../source.js'
 
 /** The question id carrying the injection judgment. Never reaches the model. */
 export const INJECTION_ID = 'injection'
@@ -129,7 +127,7 @@ export function injectionNotice (id: string, tool: string, probability: number, 
       type: 'text',
       text: t(lang, 'screen.notice', { tool, probability: score }),
     }],
-    source: { kind: 'plugin', plugin: PLUGIN_ID, form: 'notice', summary },
+    source: noticeSource(summary),
   }
 }
 
