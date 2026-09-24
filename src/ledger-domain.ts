@@ -193,6 +193,10 @@ export function judgmentSchema (): RecordSchema<JudgmentRecord> {
     { key: 'skip', kind: 'string', optional: true },
     { key: 'originalTokens', kind: 'number', optional: true },
     { key: 'baselineKeptTokens', kind: 'number', optional: true },
+    // A free string rather than an enum of today's reasons, for the same reason
+    // as `skip`: a later release adding a reason must not make this release's
+    // records unreadable.
+    { key: 'baselineUnavailable', kind: 'string', optional: true },
     { key: 'keptTokens', kind: 'number', optional: true },
     { key: 'segments', kind: 'number', optional: true },
     { key: 'segmentsKept', kind: 'number', optional: true },
@@ -208,6 +212,11 @@ export function judgmentSchema (): RecordSchema<JudgmentRecord> {
  * discarding the cumulative history the row exists to carry. Optional means an
  * old row still parses, and the reader fills the gap with zero.
  *
+ * `baselineMeasured` / `baselineUnmeasured` are optional for the same reason.
+ * A row written before they existed reports zero coverage, which is the
+ * conservative reading: an old increment is treated as unproven rather than
+ * being credited with baselines that were never counted.
+ *
  * @returns the schema.
  */
 export function totalsSchema (): RecordSchema<LedgerTotals> {
@@ -218,6 +227,8 @@ export function totalsSchema (): RecordSchema<LedgerTotals> {
     { key: 'savedTokens', kind: 'number' },
     { key: 'baselineSavedTokens', kind: 'number' },
     { key: 'netTokens', kind: 'number' },
+    { key: 'baselineMeasured', kind: 'number', optional: true },
+    { key: 'baselineUnmeasured', kind: 'number', optional: true },
     { key: 'spentTokens', kind: 'number', optional: true },
   ])
 }

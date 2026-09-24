@@ -162,9 +162,19 @@ export async function buildStatus (deps: StatusDeps, agentId?: string): Promise<
   if (summary.judged > 0) {
     lines.push('')
     lines.push(t(lang, 'status.saved', { tokens: Math.round(summary.savedTokens) }))
-    if (summary.baselineSavedTokens > 0 || summary.netTokens !== 0) {
+    // The increment is only as good as its coverage. Reporting "the baseline
+    // would have removed 0" over a baseline that was never measured is how a
+    // zero-baseline assumption comes to read as a result, so the coverage is
+    // printed with the number and the number is withheld when there is none.
+    if (summary.baselineMeasured > 0) {
       lines.push(t(lang, 'status.baseline', { tokens: Math.round(summary.baselineSavedTokens) }))
       lines.push(t(lang, 'status.net', { tokens: Math.round(summary.netTokens) }))
+      lines.push(t(lang, 'status.baselineCoverage', {
+        measured: summary.baselineMeasured,
+        unmeasured: summary.baselineUnmeasured,
+      }))
+    } else if (summary.baselineUnmeasured > 0) {
+      lines.push(t(lang, 'status.baselineMissing', { judgments: summary.baselineUnmeasured }))
     }
     const models = Object.entries(summary.models)
     if (models.length > 0) {

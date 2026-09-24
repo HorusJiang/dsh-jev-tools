@@ -61,6 +61,14 @@ function harness (options: {
   unknown?: number[]
   /** Raw settings overrides, resolved through the schema. */
   config?: unknown
+  /**
+   * The host's deterministic pruner, when a test wants a baseline measured.
+   *
+   * Omitted means no `toolResultPruner` service, which is the real situation on
+   * this profile and the one that used to be indistinguishable in the ledger
+   * from a pruner that measured zero.
+   */
+  baseline?: (blocks: readonly unknown[]) => readonly unknown[] | null
 } = {}) {
   const cache = createContextCache()
   const ledger = createMemoryLedger()
@@ -89,7 +97,9 @@ function harness (options: {
         return { model: 'jev-1.13.0', requestedModel: 'jev-latest', answers: answers as never }
       },
     }),
-    pruner: () => undefined,
+    pruner: () => options.baseline === undefined
+      ? undefined
+      : { measureContent: () => 0, pruneContent: options.baseline },
     cache,
     budget: createBudget(holder.value.prune.perTurnLimit, holder.value.sessionCallLimit),
     memo: createMemo(),
@@ -316,6 +326,99 @@ test('a fully readable response is still pruned, so the guard is not over-eager'
   assert.equal(decision.kind, 'accept')
   assert.equal(ledger.entries().at(-1)?.outcome, 'judged')
   assert.ok((ledger.entries().at(-1)?.keptTokens ?? 0) < (ledger.entries().at(-1)?.originalTokens ?? 0))
+})
+
+// ── the deterministic baseline A/B ──────────────────────────────────────────
+
+test('a pruner reporting the payload in budget is a measurement, not a gap', async () => {
+  const irrelevant = Array.from({ length: 30 }, () => 0)
+  const { listener, cache, ledger } = harness({ relevance: irrelevant, baseline: () => null })
+  cache.remember('agent-1', 'fix the parser bug')
+  const content = [{ type: 'text', text: payload(30) }]
+
+  await listener(EXEC, { isError: false, content }, accept)
+
+  const record = ledger.entries().at(-1)
+  assert.equal(record?.outcome, 'judged')
+  // `null` means "inside DSH's own budget", so the deterministic pruner would
+  // have kept all of it. Recording the full original is what turns
+  // `baselineSavedTokens: 0` from a guess into a measurement — and it is the
+  // case that used to be stored as an absent field, identical to a pruner that
+  // was never there.
+  assert.equal(record?.baselineKeptTokens, record?.originalTokens)
+  assert.equal(record?.baselineUnavailable, undefined)
+  assert.equal(ledger.summary().baselineMeasured, 1)
+  assert.equal(ledger.summary().baselineUnmeasured, 0)
+  assert.equal(ledger.summary().baselineSavedTokens, 0)
+})
+
+test('a pruner that acts makes the increment smaller than the removal', async () => {
+  const irrelevant = Array.from({ length: 30 }, () => 0)
+  // Half the payload: the deterministic cut would already have removed the
+  // rest, so only part of what this plugin removes is genuinely new.
+  const { listener, cache, ledger } = harness({
+    relevance: irrelevant,
+    baseline: () => [{ type: 'text', text: payload(15) }],
+  })
+  cache.remember('agent-1', 'fix the parser bug')
+  const content = [{ type: 'text', text: payload(30) }]
+
+  await listener(EXEC, { isError: false, content }, accept)
+
+  const record = ledger.entries().at(-1)
+  const summary = ledger.summary()
+  assert.ok((record?.baselineKeptTokens ?? 0) > 0, 'the baseline kept something')
+  assert.ok(
+    (record?.baselineKeptTokens ?? 0) < (record?.originalTokens ?? 0),
+    'and less than everything, so it acted'
+  )
+  assert.equal(summary.baselineMeasured, 1)
+  assert.equal(
+    summary.netTokens,
+    (record?.baselineKeptTokens ?? 0) - (record?.keptTokens ?? 0),
+    'the increment is measured against the baseline, not against the original'
+  )
+  assert.ok(summary.netTokens < summary.savedTokens, 'and is smaller than the raw removal')
+})
+
+test('an absent pruner is recorded as unmeasured, never as a zero baseline', async () => {
+  const irrelevant = Array.from({ length: 30 }, () => 0)
+  // No `baseline` option: the harness supplies no service, which is exactly the
+  // situation this profile has been running in.
+  const { listener, cache, ledger } = harness({ relevance: irrelevant })
+  cache.remember('agent-1', 'fix the parser bug')
+  const content = [{ type: 'text', text: payload(30) }]
+
+  await listener(EXEC, { isError: false, content }, accept)
+
+  const record = ledger.entries().at(-1)
+  const summary = ledger.summary()
+  assert.equal(record?.baselineKeptTokens, undefined)
+  assert.equal(record?.baselineUnavailable, 'no-service', 'the reason is named, not implied')
+  assert.equal(summary.baselineMeasured, 0)
+  assert.equal(summary.baselineUnmeasured, 1)
+  // The saving is still credited to the plugin — understating it would be
+  // wrong — but the counters now say it rests on an assumption.
+  assert.equal(summary.netTokens, summary.savedTokens)
+})
+
+test('a pruner that throws is recorded as an error, not as a zero baseline', async () => {
+  const irrelevant = Array.from({ length: 30 }, () => 0)
+  const { listener, cache, ledger } = harness({
+    relevance: irrelevant,
+    baseline: () => { throw new Error('pruner exploded') },
+  })
+  cache.remember('agent-1', 'fix the parser bug')
+  const content = [{ type: 'text', text: payload(30) }]
+
+  const decision = await listener(EXEC, { isError: false, content }, accept)
+
+  // Fail-open: a broken pruner must not break pruning.
+  assert.equal(decision.kind, 'accept')
+  const record = ledger.entries().at(-1)
+  assert.equal(record?.outcome, 'judged')
+  assert.equal(record?.baselineUnavailable, 'error')
+  assert.equal(ledger.summary().baselineUnmeasured, 1)
 })
 
 // ── shadow mode ─────────────────────────────────────────────────────────────

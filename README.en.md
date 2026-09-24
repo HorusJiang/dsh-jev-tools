@@ -33,13 +33,15 @@ Two things are worth being clear about, and one is yours to own:
 
 | Capability | Fires on | What it does |
 |---|---|---|
-| Prune tool output | a `read` `grep` `glob` `web_fetch` `web_search` result over 2000 tokens | judges each segment for relevance to the request, drops the irrelevant ones, leaves a visible notice |
+| Prune tool output | a `read` `grep` `glob` `web_fetch` `web_search` result over 2000 tokens | judges each segment for relevance to the request and keeps the relevant ones; what survives is **scattered**, not one contiguous middle cut out |
 | Screen for injection | the body fetched by `web_fetch` / `web_search` | judges whether it contains instructions aimed at the model, and attaches a notice past the threshold |
 | Skill suggestion | the first prompt assembly of each turn, with a skill catalog of 15 or more | reads the latest user message (falling back to the last three when it is too short) and picks at most one skill |
 | `jev_ask` | called by the model | any typed question, answered with probabilities |
 | `jev_gate` | called by the model | checks each claim against evidence before "done" is declared |
 
 The first two share three properties that are not negotiable: **it ranks, it never thresholds** (the probabilities are a good ranking and a bad threshold); **deterministic floors** (head, tail, and high-confidence segments always survive); **fail-open** (every failure path passes content through untouched — pruning never becomes the reason a task fails).
+
+**The active ingredient has not been measured to be *picking well*.** The probabilities order the segments that are kept, but the deterministic cut keeps a **fixed** budget — DSH's defaults are `thresholdChars 8192` / `headChars 4096` / `tailChars 1024`, i.e. over 8192 characters it keeps a 4096-character head and a 1024-character tail — while this plugin keeps a **proportion**, measured at roughly half the payload. **Which one retains more depends on payload size**, so the two cross over, and "saves far more than the deterministic cut" is not unconditionally true. And **picking well versus merely keeping more** has not been measured apart. See [Ledger and measurement](#ledger-and-measurement).
 
 A pruning notice looks like this:
 
@@ -156,6 +158,8 @@ Every judgment writes a **metadata-only** record (time, token and segment counts
 
 That is also why the ledger **cannot report accuracy** — a `Noul` answer carries no confidence field, and nothing tells you whether a pruned segment turned out to be needed. Accuracy can only come from data you labelled yourself. It is why no accuracy figure is quoted here: the only quality evidence so far is 8/8 on eight self-authored Chinese three-way samples, which shows the pipeline works on CJK input and is **not enough to state an accuracy**.
 
+The ledger also **separates "baseline measured" from "baseline unavailable"**. Every prune calls DSH's own `toolResultPruner` on the same payload and records what it would have kept as `baselineKeptTokens`. A `null` — the payload is inside DSH's own budget — **is a measurement too**: it means the baseline would have kept all of it, so the full original is recorded; only a missing service or a thrown call records `baselineUnavailable`. Without that pair, `baselineSavedTokens: 0` could mean either "the baseline removes nothing here" or "we never looked", and the two say opposite things about the net gain. `/jev-status` prints the **coverage** next to the increment, and when no baseline was ever measured it reports **no** net gain — only the removal.
+
 The ledger persists under `$DSH_HOME/storages/dsh_jev_tools/` when the profile has storage, so cumulative numbers survive a restart; memory and disk each keep the latest 1000 records, while the cumulative counters live in their own single row. Writes are best-effort — a failure increments a counter and never throws.
 
 One of those counters is **spend**: input is billed at `$0.042` per million tokens and output is free, so cumulative input tokens *is* the cost, and both `/jev-status` and `npm run measure -- --ledger` show it in dollars. The ledger still cannot report accuracy — for the reason above.
@@ -174,7 +178,7 @@ The plugin follows your language in both directions with no configuration: the s
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 246 tests (node --test, no test framework)
+npm test                         # builds first, then runs 253 tests (node --test, no test framework)
 node scripts/check-tarball.mjs   # asserts the published tarball carries no local state and nothing is missing
 node scripts/release-notes.ts 0.1.8  # preview a version's GitHub Release body (the workflow calls this on release)
 npm run trigger-rate             # trigger rates from local session logs — no key, no network

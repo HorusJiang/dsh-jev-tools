@@ -58,7 +58,11 @@ function deps (overrides: Partial<StatusDeps> = {}): StatusDeps {
 test('a persisted ledger says so, and reports the cumulative count', async () => {
   const report = await buildStatus(deps({
     ledger: stubLedger(
-      { records: 57, judged: 40, skipped: 17, savedTokens: 21_000, baselineSavedTokens: 8_000, netTokens: 13_000, retained: 57 },
+      {
+        records: 57, judged: 40, skipped: 17, savedTokens: 21_000,
+        baselineSavedTokens: 8_000, netTokens: 13_000,
+        baselineMeasured: 9, baselineUnmeasured: 4, retained: 57,
+      },
       { kind: 'domain', failures: 0 }
     ),
   }), 'agent-1')
@@ -68,9 +72,34 @@ test('a persisted ledger says so, and reports the cumulative count', async () =>
   assert.match(report, /Total removed: 21000 tokens/)
   assert.match(report, /built-in deterministic pruner would have removed: 8000 tokens/)
   assert.match(report, /net gain from this plugin: 13000 tokens/)
+  // The increment must carry its own coverage, or a zero baseline that was
+  // never measured is indistinguishable from one that was.
+  assert.match(report, /baseline measured on 9 judgments, unavailable on 4/)
   // Nothing was evicted, so the retention line must stay out of the report.
   assert.doesNotMatch(report, /retained in memory/)
   assert.doesNotMatch(report, /write failures/)
+})
+
+test('an increment over an unmeasured baseline is not reported as a net gain', async () => {
+  // The specific failure this guards: with no baseline measured, the report
+  // used to print "the pruner would have removed 0 tokens" and then "net gain:
+  // 39000" — a zero baseline that was never measured reading as a result.
+  // Withholding the net number is the honest output.
+  const report = await buildStatus(deps({
+    ledger: stubLedger(
+      {
+        records: 15, judged: 15, savedTokens: 39_000,
+        baselineSavedTokens: 0, netTokens: 39_000,
+        baselineUnmeasured: 15, retained: 15,
+      },
+      { kind: 'domain', failures: 0 }
+    ),
+  }), 'agent-1')
+
+  assert.match(report, /Total removed: 39000 tokens/)
+  assert.match(report, /No baseline was measurable for any of the 15 prune judgments/)
+  assert.doesNotMatch(report, /net gain from this plugin/)
+  assert.doesNotMatch(report, /deterministic pruner would have removed/)
 })
 
 test('a memory-only ledger warns that the numbers reset', async () => {

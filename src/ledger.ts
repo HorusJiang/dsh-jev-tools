@@ -10,7 +10,9 @@
  *      *net* gain over that existing baseline was never measurable from
  *      history. Recording both what the deterministic pruner would have kept
  *      and what semantic selection actually kept makes the increment a number
- *      from the first session rather than an argument.
+ *      from the first session rather than an argument — and recording *how
+ *      often the baseline could be measured at all* keeps that number from
+ *      reading as a measurement when the pruner simply was not there.
  *   2. **Version traceability.** Aliases move between releases, so the model
  *      that actually answered is recorded per judgment rather than assumed.
  *   3. **Diagnosis.** Why a judgment did not happen is the question "the plugin
@@ -37,6 +39,24 @@ import type { SkipReason } from './degrade.js'
 /** Which capability produced a record. */
 export type LedgerFeature = 'prune' | 'suggest' | 'screen' | 'tool' | 'command'
 
+/**
+ * Why the deterministic baseline has no number for a prune judgment.
+ *
+ * The baseline is measured by calling the host's `toolResultPruner` on the same
+ * payload. Three outcomes are possible and they must not be confused:
+ *
+ *   1. it answers with content → the baseline kept that much;
+ *   2. it answers `null` → the payload is inside DSH's own budget, so the
+ *      baseline would have kept *all* of it. That is a measurement;
+ *   3. it is absent (`no-service`) or refuses (`error`) → nothing was measured.
+ *
+ * Before this type existed, cases 2 and 3 both left `baselineKeptTokens`
+ * unset, so `baselineSavedTokens: 0` meant either "the baseline removes
+ * nothing here" or "we never looked" — the same unreadable collapse the skip
+ * reasons were introduced to fix.
+ */
+export type BaselineUnavailable = 'no-service' | 'error'
+
 /** One judgment, successful or declined. */
 export interface JudgmentRecord {
   readonly ts: number
@@ -55,8 +75,16 @@ export interface JudgmentRecord {
   // ── prune measurements ────────────────────────────────────────────────────
   /** Estimated tokens of the payload as it arrived. */
   readonly originalTokens?: number
-  /** What the deterministic pruner alone would have kept, when it would act. */
+  /**
+   * What the deterministic pruner alone would have kept, when it answered.
+   *
+   * Present only for a real measurement. A pruner that reports the payload as
+   * inside its budget keeps everything, and that is recorded here as the full
+   * `originalTokens` rather than being left absent.
+   */
   readonly baselineKeptTokens?: number
+  /** Set when no baseline number exists, so an absent field is never silent. */
+  readonly baselineUnavailable?: BaselineUnavailable
   /** What semantic selection actually kept. */
   readonly keptTokens?: number
   readonly segments?: number
@@ -79,6 +107,24 @@ export interface LedgerTotals {
   readonly savedTokens: number
   /** Tokens the deterministic pruner would have removed on the same inputs. */
   readonly baselineSavedTokens: number
+  /**
+   * Prune judgments whose baseline was actually measured.
+   *
+   * Stored next to {@link baselineUnmeasured} because the A/B must never read
+   * as a measurement when it was an assumption. Read the pair together: an
+   * increment reported over 0 measured baselines is an upper bound, not a
+   * result.
+   */
+  readonly baselineMeasured: number
+  /**
+   * Prune judgments with no measurable baseline.
+   *
+   * Their saving is still attributed to this plugin — the alternative would
+   * understate it — but with no baseline to subtract, so `netTokens` counts
+   * them as pure increment. That is why the count is carried: it says how much
+   * of the increment rests on an assumption rather than on a measurement.
+   */
+  readonly baselineUnmeasured: number
   /**
    * The increment: what semantic selection removed beyond the existing
    * deterministic baseline. Negative means the plugin kept *more* than the
@@ -130,6 +176,7 @@ export interface Ledger {
 /** The zero value of {@link LedgerTotals}. */
 export const EMPTY_TOTALS: LedgerTotals = {
   records: 0, judged: 0, skipped: 0, savedTokens: 0, baselineSavedTokens: 0, netTokens: 0,
+  baselineMeasured: 0, baselineUnmeasured: 0,
   spentTokens: 0,
 }
 
@@ -148,6 +195,7 @@ function measuresPrune (entry: JudgmentRecord): boolean {
 export function addToTotals (totals: LedgerTotals, entry: JudgmentRecord): LedgerTotals {
   const judged = entry.outcome === 'judged'
   let { savedTokens, baselineSavedTokens, netTokens } = totals
+  let { baselineMeasured, baselineUnmeasured } = totals
   // Summed for every record that carries a count, judged or not: a record only
   // has `inputTokens` when a response came back with usage, which is exactly
   // when the tokens were billed.
@@ -156,14 +204,21 @@ export function addToTotals (totals: LedgerTotals, entry: JudgmentRecord): Ledge
     const original = entry.originalTokens ?? 0
     const kept = entry.keptTokens ?? 0
     // An absent baseline means the deterministic pruner was not there to
-    // measure (no `toolResultPruner` service, or it declined), so it would have
+    // measure (no `toolResultPruner` service, or it failed), so it would have
     // removed nothing and the whole saving is this plugin's. That reading also
     // keeps `saved === baselineSaved + net` exact instead of leaving a residual
     // that no number in the report accounts for.
+    //
+    // It is an *assumption*, and the counters now say so: an unmeasured record
+    // is counted in `baselineUnmeasured`, so a reader can tell an increment
+    // measured against a real baseline from one that merely assumed a zero one.
+    const measured = entry.baselineKeptTokens !== undefined
     const baselineKept = entry.baselineKeptTokens ?? original
     savedTokens += original - kept
     baselineSavedTokens += original - baselineKept
     netTokens += baselineKept - kept
+    if (measured) baselineMeasured += 1
+    else baselineUnmeasured += 1
   }
   return {
     records: totals.records + 1,
@@ -172,6 +227,8 @@ export function addToTotals (totals: LedgerTotals, entry: JudgmentRecord): Ledge
     savedTokens,
     baselineSavedTokens,
     netTokens,
+    baselineMeasured,
+    baselineUnmeasured,
     spentTokens,
   }
 }

@@ -291,17 +291,27 @@ function reportLedger (
   report.counts = { records: records.length, judged: judged.length, skipped: skipped.length }
 
   // The increment: what semantic selection removed beyond the deterministic
-  // baseline DSH already applies. An absent baseline means the deterministic
-  // pruner was not there to measure, so it would have removed nothing.
+  // baseline DSH already applies. A record only carries `baselineKeptTokens`
+  // when the baseline was actually measured; an absent one means no pruner was
+  // available to ask, which is *not* the same as "the baseline would have
+  // removed nothing". The two are counted separately and the coverage is
+  // printed next to the number, because an increment over zero measured
+  // baselines is an upper bound rather than a result.
   let original = 0
   let kept = 0
   let baselineKept = 0
+  let baselineMeasured = 0
   let segments = 0
   let segmentsKept = 0
   for (const entry of prunes) {
     original += entry.originalTokens ?? 0
     kept += entry.keptTokens ?? 0
-    baselineKept += entry.baselineKeptTokens ?? entry.originalTokens ?? 0
+    if (entry.baselineKeptTokens === undefined) {
+      baselineKept += entry.originalTokens ?? 0
+    } else {
+      baselineKept += entry.baselineKeptTokens
+      baselineMeasured += 1
+    }
     segments += entry.segments ?? 0
     segmentsKept += entry.segmentsKept ?? 0
   }
@@ -315,9 +325,19 @@ function reportLedger (
     console.log(`  this plugin kept        ${kept}   (removed ${saved}, ${pct(saved)})`)
     console.log(`  DSH baseline kept       ${baselineKept}   (would have removed ${baselineSaved}, ${pct(baselineSaved)})`)
     console.log(`  increment over baseline ${net}   ${pct(net)}`)
+    console.log(`  baseline measured on    ${baselineMeasured}/${prunes.length} payloads`)
     if (segments > 0) console.log(`  segments kept           ${segmentsKept}/${segments}`)
-    console.log('  The increment is what semantic selection removed that the built-in')
-    console.log('  contiguous head/middle/tail cut would have left in the context.')
+    if (baselineMeasured === 0) {
+      console.log('  No baseline could be measured on any payload, so the increment above is')
+      console.log('  an upper bound: it assumes the deterministic pruner would have removed')
+      console.log('  nothing. It is not a measurement of the plugin\'s net gain.')
+    } else if (baselineMeasured < prunes.length) {
+      console.log(`  The increment is measured over ${baselineMeasured} of ${prunes.length} payloads;`)
+      console.log('  the rest assume a zero baseline, so read it as an upper bound.')
+    } else {
+      console.log('  The increment is what semantic selection removed that the built-in')
+      console.log('  contiguous head/middle/tail cut would have left in the context.')
+    }
     report.tokens = { original, kept, saved, baselineKept, baselineSaved, net, segments, segmentsKept }
   }
 
@@ -325,6 +345,18 @@ function reportLedger (
     console.log('\n--- counters on the medium (cumulative across runs) ---')
     console.log(`  records ${totals.records}  judged ${totals.judged}  skipped ${totals.skipped}`)
     console.log(`  removed ${totals.savedTokens}  baseline would have removed ${totals.baselineSavedTokens}  increment ${totals.netTokens}`)
+    const measured = totals.baselineMeasured ?? 0
+    const unmeasured = totals.baselineUnmeasured ?? 0
+    if (measured + unmeasured > 0) {
+      console.log(`  baseline measured on ${measured} pruned payloads, unavailable on ${unmeasured}`)
+      if (measured === 0) {
+        console.log('  No baseline was ever measured, so the increment above is an upper bound,')
+        console.log('  not a measurement over the existing deterministic baseline.')
+      }
+    } else {
+      console.log('  This counters row predates the baseline-coverage counters, so how much')
+      console.log('  of the increment was measured against a real baseline is unknown.')
+    }
     if (totals.records !== records.length) {
       console.log(`  (${totals.records - records.length} records were evicted by bounded retention,`)
       console.log('   which is why the cumulative counters are stored separately)')

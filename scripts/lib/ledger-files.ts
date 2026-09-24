@@ -40,6 +40,9 @@ export interface LedgerTotals {
   readonly savedTokens: number
   readonly baselineSavedTokens: number
   readonly netTokens: number
+  /** Optional: a row written before these counters existed does not carry them. */
+  readonly baselineMeasured?: number
+  readonly baselineUnmeasured?: number
   /** Optional: a row written before this counter existed does not carry it. */
   readonly spentTokens?: number
 }

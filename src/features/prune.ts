@@ -44,7 +44,7 @@ import type { JevSettings } from '../config.js'
 import type { ContextCache } from '../context-cache.js'
 import type { Budget } from '../budget.js'
 import type { Memo } from '../memo.js'
-import type { Ledger, LedgerFeature } from '../ledger.js'
+import type { Ledger, LedgerFeature, BaselineUnavailable } from '../ledger.js'
 import type { CredentialsService } from '../host.js'
 import type {
   PostToolDecision, PostToolListener, ToolExecutionResultLike, ToolResultPrunerService,
@@ -618,14 +618,27 @@ export function createPruneListener (deps: PruneDeps): PostToolListener {
     // What DSH's own deterministic pruner would have kept on the same input.
     // This is the only way the increment over the existing baseline becomes a
     // measured number instead of an argument.
+    //
+    // The three outcomes are kept apart on purpose. `null` is an *answer*, not
+    // a failure: it means the payload is inside DSH's own budget, so the
+    // deterministic pruner would have kept all of it — a real measurement that
+    // the baseline removes nothing here. Only a missing service or a thrown
+    // call leaves no number, and that case is labelled so the ledger can say
+    // "unmeasured" instead of implying a zero baseline.
     let baselineKeptTokens: number | undefined
-    try {
-      const baseline = deps.pruner()?.pruneContent(effective)
-      if (baseline !== undefined && baseline !== null) {
-        baselineKeptTokens = estimateTokens(textOf(baseline))
+    let baselineUnavailable: BaselineUnavailable | undefined
+    const baselinePruner = deps.pruner()
+    if (baselinePruner === undefined) {
+      baselineUnavailable = 'no-service'
+    } else {
+      try {
+        const baseline = baselinePruner.pruneContent(effective)
+        baselineKeptTokens = baseline === null
+          ? originalTokens
+          : estimateTokens(textOf(baseline))
+      } catch {
+        baselineUnavailable = 'error'
       }
-    } catch {
-      baselineKeptTokens = undefined
     }
 
     deps.ledger.record({
@@ -643,6 +656,7 @@ export function createPruneListener (deps: PruneDeps): PostToolListener {
       segments: chunks.length,
       segmentsKept: keep.filter(Boolean).length,
       ...(baselineKeptTokens === undefined ? {} : { baselineKeptTokens }),
+      ...(baselineUnavailable === undefined ? {} : { baselineUnavailable }),
     })
 
     const keptCount = keep.filter(Boolean).length

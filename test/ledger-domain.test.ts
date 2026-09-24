@@ -296,19 +296,60 @@ test('a counters row written before the spend counter still loads', () => {
   assert.equal(summary.records, 5, 'the counters that were carried survive')
   assert.equal(summary.savedTokens, 100)
   assert.equal(summary.spentTokens, 0, 'a counter the old row cannot carry reads as zero')
+  // Conservative on purpose: an old increment is reported as unproven rather
+  // than credited with baselines that were never counted.
+  assert.equal(summary.baselineMeasured, 0)
+  assert.equal(summary.baselineUnmeasured, 0)
 })
 
 test('a record with no baseline measurement credits the whole saving to this plugin', () => {
   // An absent baseline means the deterministic pruner was not there to measure,
   // so it would have removed nothing. Attributing the saving elsewhere would
   // understate the plugin; inventing a partial baseline would be fabrication.
+  // What must not happen is this reading passing silently as a measurement,
+  // which is what `baselineUnmeasured` now prevents.
   const folded = addToTotals(EMPTY_TOTALS, record({ originalTokens: 1_000, keptTokens: 400 }))
   assert.equal(folded.savedTokens, 600)
   assert.equal(folded.baselineSavedTokens, 0)
   assert.equal(folded.netTokens, 600)
+  assert.equal(folded.baselineMeasured, 0, 'nothing was measured')
+  assert.equal(folded.baselineUnmeasured, 1, 'and the record says so')
   // The split must always add up, or the report shows three numbers that
   // cannot be reconciled with each other.
   assert.equal(folded.savedTokens, folded.baselineSavedTokens + folded.netTokens)
+})
+
+test('a record with a measured baseline counts as measured and shrinks the increment', () => {
+  // The pruner answered: it would have kept 700 of the 1,000 tokens. Only the
+  // 300 that this plugin removes *beyond* that is a real increment.
+  const folded = addToTotals(EMPTY_TOTALS, record({
+    originalTokens: 1_000, baselineKeptTokens: 700, keptTokens: 400,
+  }))
+  assert.equal(folded.savedTokens, 600)
+  assert.equal(folded.baselineSavedTokens, 300)
+  assert.equal(folded.netTokens, 300)
+  assert.equal(folded.baselineMeasured, 1)
+  assert.equal(folded.baselineUnmeasured, 0)
+  assert.equal(folded.savedTokens, folded.baselineSavedTokens + folded.netTokens)
+})
+
+test('an unmeasured record is distinguishable from one the pruner measured as zero', () => {
+  // The whole point of the counter pair. Both records have
+  // `baselineSavedTokens === 0`, and before the counters existed that was all
+  // the ledger could say: the baseline removes nothing here. One of these two
+  // actually means "we never looked".
+  const unmeasured = addToTotals(EMPTY_TOTALS, record({ originalTokens: 1_000, keptTokens: 400 }))
+  const measuredZero = addToTotals(EMPTY_TOTALS, record({
+    originalTokens: 1_000, baselineKeptTokens: 1_000, keptTokens: 400,
+  }))
+
+  assert.equal(unmeasured.baselineSavedTokens, measuredZero.baselineSavedTokens)
+  assert.equal(unmeasured.baselineUnmeasured, 1)
+  assert.equal(measuredZero.baselineMeasured, 1)
+  assert.notDeepEqual(
+    [unmeasured.baselineMeasured, unmeasured.baselineUnmeasured],
+    [measuredZero.baselineMeasured, measuredZero.baselineUnmeasured]
+  )
 })
 
 test('a restart is not a reset: counters and records survive a reopen', async () => {

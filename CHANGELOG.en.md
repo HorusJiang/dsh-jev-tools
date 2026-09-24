@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.10` | 2026-09-25 | **pending** | The ledger records baseline coverage; a net gain is no longer reported without a measured baseline. |
 | `0.1.9` | 2026-09-25 | **pending** | An injected notice used to fail the whole turn; the source kind now names its producer, as format v4 requires. |
 | `0.1.8` | 2026-09-22 | **published** | Skill suggestion had **never fired**, now fixed; the two tools' quota and refusal reasons are no longer dead or silent. |
 | `0.1.7` | 2026-09-22 | **published** | Structural failures are no longer silent; cost is visible; calibration gains AUC and a threshold sweep; CI and tag-driven releases. |
@@ -23,6 +24,30 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.10] — 2026-09-25
+
+### Added
+
+- **Baseline coverage in the ledger.** Every prune judgment now records whether the deterministic
+  baseline was really measured: content answers are stored as `baselineKeptTokens`; a `null` answer
+  (the payload is inside DSH's own budget) is stored as the **full original token count** — a
+  measurement that the baseline removes nothing, not missing data; an absent service or a thrown
+  call is stored as `baselineUnavailable: no-service | error`. The totals gain `baselineMeasured`
+  and `baselineUnmeasured`. Evidence: on 2026-09-25 two prune judgments were indistinguishable in
+  the old ledger — a headless composition measured `baselineKeptTokens: 4441.5`, while a web
+  composition recorded `no-service` (the Web surface mounts the deterministic pruner behind an
+  agent preset).
+
+### Changed
+
+- **A net gain is no longer reported without a baseline.** `/jev-status` prints the coverage next
+  to the increment, and with `baselineMeasured` at 0 it reports only the removal and says the net
+  gain has no data. The old totals computed `baselineKept = entry.baselineKeptTokens ?? original`,
+  which read "never measured" as "the baseline removes nothing" — making the net gain equal to
+  everything the plugin removed: an assumption, not a result.
+- Two README statements are now accurate: pruning keeps **scattered relevant segments** rather than
+  cutting one contiguous middle block, and the net increment is stated with its coverage premise.
 
 ## [0.1.9] — 2026-09-25
 

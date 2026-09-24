@@ -166,6 +166,14 @@ const CATALOG = {
     en: '  of which the built-in deterministic pruner would have removed: {tokens} tokens',
   },
   'status.net': { zh: '  本插件相对它的净增量：{tokens} tokens', en: '  net gain from this plugin: {tokens} tokens' },
+  'status.baselineCoverage': {
+    zh: '  基线实测覆盖：{measured} 次有基线，{unmeasured} 次无。无基线的那部分按"基线本就不削"计入净增量，是假设而非实测。',
+    en: '  baseline measured on {measured} judgments, unavailable on {unmeasured}. The unmeasured share is counted as pure increment by assuming the baseline removed nothing — an assumption, not a measurement.',
+  },
+  'status.baselineMissing': {
+    zh: '  基线从未测得（{judgments} 次剪枝判定都没有可用的确定性基线），因此不报净增量：能报的只有上面的削减量，它相对确定性截断是否真有增量，目前无数据。',
+    en: '  No baseline was measurable for any of the {judgments} prune judgments, so no net gain is reported: only the removal above is known, and whether it exceeds the deterministic cut is currently unmeasured.',
+  },
   'status.versions': { zh: '  实际作答版本：{list}', en: '  Versions that answered: {list}' },
 
   // ── jev_ask result ────────────────────────────────────────────────────────
