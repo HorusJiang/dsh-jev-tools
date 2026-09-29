@@ -18,9 +18,12 @@
  *   - `remote.credentials` answers only whether a key is configured, its
  *     source, and whether it is writable. The secret literal never rides a
  *     response; the input starts blank on every load.
- *   - `remote.settings` reads and writes this plugin's own namespace, so the
- *     capability toggles, the judgment endpoint and the model are the same
- *     values the host resolves.
+ *   - `configForms` is the browser's settings seam: `get(namespace)` binds this
+ *     bundle's Host entry, and the shared mirror behind it is the one place the
+ *     page reads `settings.describe()`. The toggles, the judgment endpoint and
+ *     the model are therefore the same values the host resolves — and because
+ *     the provider owns the write queue, a write from this card and one from any
+ *     other editor of the same entry are serialized together.
  *
  * Endpoint and model are hand-written fields rather than a form generated from
  * the schema: this card occupies `plugins.bundle.config` under this bundle's
@@ -121,6 +124,8 @@ window.__ModuleLoader__.load({
           + '且只留在本机。有 storage 时持久化到 $DSH_HOME/storages，重启后累计数字不丢。',
         summary: (status) => `Jev · ${status}`,
         unknownSource: '未知',
+        namespaceMissing: (ns, served) => `读取不到设置命名空间 ${ns}：挂载这一行用的 id 必须与包名一致（见 cordis.patch.yml）。`
+          + `当前宿主提供的命名空间：${served.length === 0 ? '（无）' : served.join('、')}。`,
       },
       en: {
         heading: 'Prunes long tool output, suggests which skill to use',
@@ -163,6 +168,9 @@ window.__ModuleLoader__.load({
           + 'survive a restart.',
         summary: (status) => `Jev · ${status}`,
         unknownSource: 'unknown',
+        namespaceMissing: (ns, served) => `The settings namespace ${ns} was not found: the row must be mounted `
+          + `under the bundle's package name (see cordis.patch.yml). The host serves: `
+          + `${served.length === 0 ? '(none)' : served.join(', ')}.`,
       },
     }
 
@@ -205,15 +213,6 @@ window.__ModuleLoader__.load({
         if (response === undefined || response === null) return undefined
         if (response.ok === false) return undefined
         return response.value
-      }
-
-      /** Normalise `settings.describe()` output: an array or `{namespaces}`. */
-      function namespacesOf (described) {
-        if (Array.isArray(described)) return described
-        if (described !== null && typeof described === 'object' && Array.isArray(described.namespaces)) {
-          return described.namespaces
-        }
-        return []
       }
 
       /** Hidden characters without being a password field, so the key stays out of keychain offers. */
@@ -291,6 +290,8 @@ window.__ModuleLoader__.load({
         const [draft, setDraft] = React.useState('')
         const [note, setNote] = React.useState('')
         const [busy, setBusy] = React.useState(false)
+        /** Whether the host's profile accepts form edits at all. */
+        const [formWritable, setFormWritable] = React.useState(true)
         // The endpoint travels with the key: a key issued by OpenRouter or a
         // self-hosted System One host earns a 401 against the default host, and
         // because every capability here is fail-open that 401 looks like the
@@ -300,6 +301,32 @@ window.__ModuleLoader__.load({
         const [baseUrlDraft, setBaseUrlDraft] = React.useState('')
         const [modelDraft, setModelDraft] = React.useState('')
         const seeded = React.useRef(false)
+
+        /**
+         * The browser's one settings seam.
+         *
+         * `ctx.configForms` is provided by the settings UI and owns the single
+         * `settings.describe()` reader in the browser; every page — the four
+         * official ones included — derives from it. Its `get(namespace)` binds
+         * this bundle's entry by the namespace the host publishes (the mount row
+         * id, which is why the row and the package name have to agree).
+         */
+        const forms = ctx.configForms
+        const form = forms !== undefined && typeof forms.get === 'function' ? forms.get(NS) : undefined
+
+        /** Every namespace the browser's settings mirror currently serves. */
+        function servedNamespaces () {
+          try {
+            if (forms === undefined || typeof forms.describe !== 'function') return []
+            const view = forms.describe().getSnapshot().view
+            return Array.isArray(view !== null && view !== undefined ? view.namespaces : undefined)
+              ? view.namespaces.map((entry) => entry.ns).filter((ns) => typeof ns === 'string')
+              : []
+          } catch {
+            return []
+          }
+        }
+
         const t = S[lang]
 
         // Seed the endpoint drafts once, when the host's values first arrive.
@@ -330,16 +357,25 @@ window.__ModuleLoader__.load({
         const effectiveBaseUrl = settingsBaseUrl === '' ? DEFAULT_BASE_URL : settingsBaseUrl
         const openRouter = isOpenRouter(effectiveBaseUrl)
 
-        /** Re-read both seams. Never throws: a failure becomes a visible note. */
+        /** Re-read the shared form and the credential seam. Never throws: a failure becomes a visible note. */
         const load = React.useCallback(async () => {
           try {
-            const settingsApi = remote('remote.settings')
-            if (settingsApi !== undefined) {
-              const described = valueOf(await settingsApi.describe())
-              const mine = namespacesOf(described).find((entry) => entry !== null && entry !== undefined && entry.ns === NS)
-              if (mine !== undefined) {
-                setSettings(mine.value ?? null)
-                setRevision(mine.revision)
+            if (form === undefined) {
+              setNote(S[langOf(ctx)].noSettingsService)
+            } else {
+              const snapshot = typeof form.getSnapshot === 'function' ? form.getSnapshot() : undefined
+              if (snapshot !== undefined && snapshot.value !== undefined) {
+                setSettings(snapshot.value ?? null)
+                setRevision(snapshot.revision)
+                setFormWritable(snapshot.writable !== false)
+              } else {
+                // The namespace DSH publishes is the mount row id, while this card
+                // addresses the bundle by package name — so a profile that mounts
+                // the row under another id leaves the shared form with nothing to
+                // read. Say which namespace was missing and which ones the mirror
+                // does serve, instead of drawing the empty form that used to look
+                // exactly like "nothing is configured".
+                setNote(S[langOf(ctx)].namespaceMissing(NS, servedNamespaces()))
               }
             }
             const credentialsApi = remote('remote.credentials')
@@ -358,6 +394,14 @@ window.__ModuleLoader__.load({
         React.useEffect(() => {
           if (settings === null && credential === null) void load()
         }, [settings, credential, load])
+
+        // Live updates: the shared form derives from the browser's one settings
+        // mirror, so a write from anywhere — this card, the Plugins page, another
+        // editor — arrives here as a store replacement.
+        React.useEffect(() => {
+          if (form === undefined || typeof form.subscribe !== 'function') return undefined
+          return form.subscribe(() => { void load() })
+        }, [form, load])
 
         /** Write the staged key, then re-read: the host is the only authority on whether it landed. */
         const saveKey = React.useCallback(async () => {
@@ -383,30 +427,36 @@ window.__ModuleLoader__.load({
         }, [draft, ref, load])
 
         /**
-         * Patch top-level settings fields, then re-read the host.
+         * Write one atomic operation list through the shared form, then re-read.
          *
-         * @param {object} change - the fields to merge.
+         * Staged and saved explicitly: every settings write is a durable document
+         * mutation, so a control that committed as it settled would turn one edit
+         * into a write nobody asked for. The revision read before editing travels
+         * with the write, so a concurrent editor conflicts instead of winning
+         * silently.
+         *
+         * @param {Array<{op: string, path: string[], value?: unknown}>} ops - ordered field operations.
          * @returns {Promise<boolean>} whether the host accepted the write.
          */
-        const patch = React.useCallback(async (change) => {
+        const patch = React.useCallback(async (ops) => {
           setBusy(true)
           setNote('')
+          const strings = S[langOf(ctx)]
           try {
-            const settingsApi = remote('remote.settings')
-            if (settingsApi === undefined) {
-              setNote(S[langOf(ctx)].noSettingsService)
+            if (form === undefined) {
+              setNote(strings.noSettingsService)
               return false
             }
-            await settingsApi.update(NS, change, revision)
+            const accepted = await form.mutate(ops, revision)
             await load()
-            return true
+            return accepted !== false
           } catch (error) {
-            setNote(S[langOf(ctx)].saveFailed(String(error)))
+            setNote(strings.saveFailed(String(error)))
             return false
           } finally {
             setBusy(false)
           }
-        }, [revision, load])
+        }, [form, revision, load])
 
         /**
          * Save the endpoint fields, and only the ones that changed.
@@ -416,14 +466,14 @@ window.__ModuleLoader__.load({
          * strict-equal draft therefore produces no write at all.
          */
         const saveEndpoint = React.useCallback(async () => {
-          const change = {}
+          const ops = []
           const baseUrl = baseUrlDraft.trim()
           const model = modelDraft.trim()
           if (settings === null) return
-          if (baseUrl !== settingsBaseUrl) change.baseUrl = baseUrl
-          if (model !== settingsModel) change.model = model
-          if (Object.keys(change).length === 0) return
-          if (await patch(change)) setNote(S[langOf(ctx)].endpointSaved)
+          if (baseUrl !== settingsBaseUrl) ops.push({ op: 'set', path: ['baseUrl'], value: baseUrl })
+          if (model !== settingsModel) ops.push({ op: 'set', path: ['model'], value: model })
+          if (ops.length === 0) return
+          if (await patch(ops)) setNote(S[langOf(ctx)].endpointSaved)
         }, [baseUrlDraft, modelDraft, settings, patch])
 
         const configured = credential !== null && credential.configured === true
@@ -447,7 +497,7 @@ window.__ModuleLoader__.load({
         // silence: every capability in this plugin is fail-open.
         const baseUrlValue = baseUrlDraft.trim()
         const modelValue = modelDraft.trim()
-        const endpointReadOnly = settings === null || busy
+        const endpointReadOnly = settings === null || busy || !formWritable
         // An empty address is invalid too: storing one would POST to a relative
         // URL, and that failure is invisible everywhere else.
         const baseUrlInvalid = !BASE_URL_RE.test(baseUrlValue)
@@ -496,9 +546,9 @@ window.__ModuleLoader__.load({
             h('div', { style: { fontSize: '11px', color: MUTED, lineHeight: '16px' } }, t.endpointHint)),
 
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px', borderTop: `1px solid ${BORDER}` } },
-            toggle(t.toggleMaster, masterOn, busy || settings === null, (next) => { void patch({ enabled: next }) }),
-            toggle(t.togglePrune, pruneOn, busy || settings === null, (next) => { void patch({ prune: { enabled: next } }) }),
-            toggle(t.toggleSuggest, suggestOn, busy || settings === null, (next) => { void patch({ suggest: { enabled: next } }) })),
+            toggle(t.toggleMaster, masterOn, busy || settings === null || !formWritable, (next) => { void patch([{ op: 'set', path: ['enabled'], value: next }]) }),
+            toggle(t.togglePrune, pruneOn, busy || settings === null || !formWritable, (next) => { void patch([{ op: 'set', path: ['prune', 'enabled'], value: next }]) }),
+            toggle(t.toggleSuggest, suggestOn, busy || settings === null || !formWritable, (next) => { void patch([{ op: 'set', path: ['suggest', 'enabled'], value: next }]) })),
 
           h('div', { style: { fontSize: '11px', color: MUTED, lineHeight: '16px' } }, t.privacy(hostOf(effectiveBaseUrl))),
 
@@ -509,10 +559,11 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      // `remote` is injected alongside its namespaces, matching how the shipped
-      // settings plugins declare the same dependencies. `locale` drives the
-      // card's language.
-      inject: ['slots', 'locale', 'remote', 'remote.credentials', 'remote.settings'],
+      // `configForms` is the browser's settings seam: the provider owns the only
+      // `settings.describe()` reader, and every page — the official four included
+      // — derives from its shared mirror. `remote.credentials` is injected beside
+      // it for the key, and `locale` drives the card's language.
+      inject: ['slots', 'locale', 'remote', 'remote.credentials', 'configForms'],
       /**
        * Register the card into the bundle-configuration seat.
        *

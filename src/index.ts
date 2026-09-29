@@ -26,7 +26,6 @@ import { createJevBackend } from './backends/jev.js'
 import type { DecisionBackend } from './backends/types.js'
 import { createPruneListener } from './features/prune.js'
 import { createSkillSuggestListener } from './features/skill-suggest.js'
-import { installSettingsNamespace } from './settings-ns.js'
 import { registerStatusCommand } from './status.js'
 import { createJevAskTool } from './tools/jev-ask.js'
 import { createJevGateTool } from './tools/jev-gate.js'
@@ -139,12 +138,15 @@ export function apply (ctx: PluginContext, entry?: unknown): void {
     })()
   })
 
-  installSettingsNamespace(ctx, entry ?? {}, () => {
-    // Re-resolve on change rather than trusting a cached copy: enabling or
-    // disabling a capability must take effect without a restart.
-    current = resolveSettings(entry)
-    ctx.logger?.info(`[dsh-jev-tools] settings changed; enabled=${String(current.enabled)}`)
-  })
+  // Nothing is registered on the settings service here, and that is the DSH
+  // 0.2.0-rc.2 contract rather than an omission. `SettingsForms.describe()`
+  // generates a page for every active entry that exports a volatile Config
+  // schema, and the namespace it publishes is that entry's **row id**. A write
+  // lands in the profile patch, the include reconciles, and this entry's fiber is
+  // restarted — re-running `apply` above with the new entry, so `current` is
+  // re-resolved and a toggle takes effect without a restart. The row id in
+  // `cordis.patch.yml` therefore has to equal this package's name, which is the
+  // address the settings card uses.
 
   // The current request and turn. Needed because neither `tools/post-execute`
   // nor `AssembleContext` exposes the conversation, and `ToolExecution` carries

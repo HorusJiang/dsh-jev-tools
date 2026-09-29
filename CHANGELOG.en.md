@@ -26,6 +26,56 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
 
+## [0.1.12] — 2026-09-30
+
+### Fixed
+
+- **The configuration card could not read its own settings, so all three toggles were disabled and
+  blank and both endpoint fields were read-only.** Two causes stacked: (1) DSH publishes a bundle's
+  settings namespace under its **mount row id** (`SettingsForms.describe()` reports
+  `entry.options.id`, and a write resolves the same way), while the card (the occupant of
+  `plugins.bundle.config`) and the plugin page's config seat are keyed by the **package name**; and
+  (2) the page publishes only fields marked `.volatile()` — `volatileForm()` returns nothing for a
+  schema with no volatile field, so the namespace never appears in `describe()` at all. With the row
+  id `jev-tools` and not one `.volatile()` in the schema, the card could read nothing from either
+  side, with no error printed anywhere. That is the whole of "the settings page cannot change
+  anything" from 0.1.6 to 0.1.11 (issue #3). The mount row id is now the package name and the six
+  fields the card reads and writes are marked `.volatile()`; `test/bundle-contract.test.ts` pins the
+  package name, the row id, the namespace the card asks for, and the editability of those six fields
+  together.
+- **The `settings.installSection` call is gone.** DSH 0.2.0-rc.2's `settings` service has no such
+  method, so every mount threw a `TypeError` that the plugin's own catch turned into a warning — a
+  warning that reported a failed registration as merely unavailable. The page is generated from the
+  entry's exported Config schema anyway, and a write restarts that entry's fiber so `apply`
+  re-resolves the config: "a toggle takes effect immediately" never depended on a registration
+  callback.
+- **A namespace that is not published is now named.** The card used to draw an empty form that looked
+  exactly like "nothing is configured"; it now names the namespace it was looking for, and the file
+  that decides it.
+
+### Changed
+
+- **Configuration is resolved through the standard-schema path, and volatile markers are unwrapped.**
+  `.volatile()` wraps a marked field's resolved value in a marker object (the writer uses it to know
+  which keys to persist), so the config is resolved through `Config['~standard'].validate(value)` —
+  the very path the Loader takes — and then unwrapped recursively, leaving `model` and `baseUrl` as
+  the strings they denote. `@deepseek-ai/schemastery` moves to `^3.18.4` (the version that provides
+  `.volatile()`, and the one the host itself ships), and `@deepseek-ai/cosmokit` is added for
+  `isVolatile`.
+- **The card now reads and writes through the browser's one settings seam.** Both directions go
+  through `ctx.configForms.get(namespace)` — the same seam the four official settings pages use:
+  reads take the shared mirror's snapshot, writes submit an operation list (`{ op, path, value }`)
+  with the revision read before editing. It used to call `remote.settings` directly, and the
+  browser's single `settings.describe()` reader is the settings UI itself; a third-party card never
+  gets it — so **the host could publish the namespace and the card would still read nothing**. The
+  diagnostic now lists the namespaces the host actually serves.
+- **Resolution has to be idempotent.** The Loader hands `apply` the config **it already resolved** —
+  volatile markers included — so the input is unwrapped before it is validated. Without that,
+  `enabled` was validated as an object and threw, and any throw inside `apply` fails the whole
+  fiber: the plugin shows as failed and serves no settings namespace at all, which looks exactly
+  like "the card cannot read its own settings". `test/config.test.ts` now pins it: the Loader-shaped
+  input must resolve to the same values as the raw one.
+
 ## [0.1.11] — 2026-09-30
 
 ### Fixed

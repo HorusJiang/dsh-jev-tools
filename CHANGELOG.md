@@ -25,6 +25,43 @@
 
 已发布到 npm：`npm i dsh-jev-tools`。也可以直接从仓库检出目录安装。
 
+## [0.1.12] — 2026-09-30
+
+### Fixed
+
+- **设置卡片读不到自己的设置，三个开关全是禁用且空白、两个端点框只读。** 两个独立原因叠在一起：
+  (1) DSH 按**挂载行的 id** 发布一个 bundle 的设置命名空间（`SettingsForms.describe()` 公布的是
+  `entry.options.id`，写入也按它解析），而卡片（占 `plugins.bundle.config` 座位）与插件页的配置座位都按
+  **包名**索引；(2) 设置页只发布标了 `.volatile()` 的字段——`volatileForm()` 对一个 volatile 字段都没有的
+  schema 返回空，于是连命名空间都不会出现在 `describe()` 里。行 id 叫 `jev-tools`、schema 又一处
+  `.volatile()` 都没有时，卡片两边都取不到东西，而且**任何地方都不报错**——这就是 0.1.6→0.1.11
+  「设置页改不了」的全部原因（issue #3）。现在挂载行 id 就是包名，卡片要读要写的六个字段都标了
+  `.volatile()`，并由 `test/bundle-contract.test.ts` 把包名、行 id、卡片请求的命名空间，以及这六个字段的
+  可编辑性钉在一起。
+- **删除了 `settings.installSection` 调用。** DSH 0.2.0-rc.2 的 `settings` 服务没有这个方法，每次挂载都会抛
+  `TypeError` 再被自己的 catch 吞成一条警告——一条把「注册失败」说成「暂时不可用」的假象。设置页本来就由条目
+  导出的 Config schema 自动生成，写入会让该条目的 fiber 重启、`apply` 重新解析配置，所以「改完立即生效」
+  不依赖任何注册回调。
+- **命名空间对不上时，卡片现在会说出来。** 过去它画一个看起来像「什么都没配置」的空表单；现在它直接点名
+  找不到的命名空间，以及决定它的那份文件。
+
+### Changed
+
+- **配置解析改走 standard-schema 路径并解包 volatile 标记。** `.volatile()` 会把被标记字段的解析结果包成一个
+  标记对象（写回时用它判断哪些键要落盘），所以配置经 `Config['~standard'].validate(value)`（Loader 自己走
+  的就是这条）解析后再递归解包，`model`、`baseUrl` 这类字段拿到的仍是字符串而不是对象。
+  `@deepseek-ai/schemastery` 升到 `^3.18.4`（`.volatile()` 自该版本起提供，也正是宿主自带的版本），
+  并为 `isVolatile` 新增依赖 `@deepseek-ai/cosmokit`。
+- **卡片改走浏览器唯一的设置通道。** 现在读写都经 `ctx.configForms.get(命名空间)`（插件页上四个官方设置页
+  用的就是这一条）：读取取共享设置镜像的快照，写入按 `{ op, path, value }` 操作列表带 revision 提交。此前
+  直接调 `remote.settings`，而浏览器里 `settings.describe()` 只有一个读取方——设置 UI 自己；第三方卡片拿
+  不到它，于是**宿主已经把命名空间发布出来，卡片仍然读不到**。读不到时的提示现在会连宿主实际提供的命名
+  空间一起列出。
+- **解析必须幂等。** 宿主交给 `apply` 的是**它已经解析过的**配置（`.volatile()` 的标记对象都在里面），
+  所以要先解包输入再校验。少了这一步，`enabled` 会被当成对象校验失败并抛错，而 `apply` 里任何抛错都会让
+  整条 fiber 挂掉：插件在界面上显示「异常」、设置页一个命名空间都不提供，看起来又像"卡片读不到自己的
+  设置"。`test/config.test.ts` 现在钉住这一条（Loader 形状的输入必须与原始输入解析出同一份值）。
+
 ## [0.1.11] — 2026-09-30
 
 ### Fixed

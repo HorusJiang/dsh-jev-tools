@@ -38,25 +38,6 @@ export interface CredentialsService {
   describe (ref: string): Promise<CredentialInfo>
 }
 
-/** Hooks one optional-settings consumer supplies to the settings provider. */
-export interface SettingsSectionHooks<T> {
-  setSource (current: () => T): void
-  onChange (): void
-  validate? (value: T): void
-}
-
-/** `ctx.settings` — namespace registration and configuration surfaces. */
-export interface SettingsService {
-  installSection (
-    owner: unknown,
-    ns: string,
-    schema: unknown,
-    entry: unknown,
-    hooks: SettingsSectionHooks<never>
-  ): void
-  get (ns: string): unknown
-}
-
 /** Logging surface. Optional: a context without it must not crash the plugin. */
 export interface Logger {
   info (...args: unknown[]): void
@@ -221,7 +202,6 @@ export type PreStepListener = (
  * every consumer checks presence rather than assuming it.
  */
 export interface ServiceScope {
-  settings?: SettingsService
   credentials?: CredentialsService
   toolResultPruner?: ToolResultPrunerService
   commands?: CommandsService

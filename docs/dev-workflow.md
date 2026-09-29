@@ -94,6 +94,40 @@ application: "failed", error: { code: "ambiguous-install" }, changed: false
 注册形式已对官方实现核过：`ctx.slots.inject(槽位, () => ctx.slots.register({ name, key }, 组件))`，与 `ui-settings-plugins` 里那四张卡写法一致。
 `ui-plugin-manager` 另有一份 config ledger（`config-ledger.ts` 的 `keysOf('plugins.bundle.config')`），用来知道哪些 bundle 自带配置卡片。
 
+### 5.1 数据怎么读怎么写：只用 `ctx.configForms`，不要直接调 `remote.settings`
+
+**实测踩过（2026-09-30）**：卡片占住了座位、`plugins.bundle.config` 也挂上了，但读不到自己的设置——
+三个开关 disabled、两个端点框 readOnly，界面上**一句错都不报**。原因不是命名空间（那个也一起修了），
+而是**通道**：浏览器里 `settings.describe()` **只有一个读取方**——设置 UI 自己（`ui-settings` 的
+`SettingsDescribeMirror`，README 原话 "the one `settings.describe` reader in the browser"）。第三方卡片
+直接 `remote.settings.describe()` 拿不到东西，于是永远读到 null。
+
+正确姿势是注入 `configForms`（设置 UI 提供的客户端服务）：
+
+```js
+inject: ['slots', 'locale', 'remote', 'remote.credentials', 'configForms']
+const form = ctx.configForms.get('dsh-jev-tools')    // 命名空间 = 挂载行 id，见 §5.2
+form.getSnapshot()                                  // { status, value, base, user, revision, writable, mode }
+form.subscribe(fn)                                  // 共享镜像变化时回调（任何编辑者的写入都会到这里）
+await form.mutate([{ op: 'set', path: ['prune', 'enabled'], value: false }], revision)
+```
+
+插件页上四个官方设置页（shell / agent-loop / subagent / web-search）全都走这条；`get` 的命名空间就是
+`settings.describe()` 公布的 `entry.options.id`，也就是**挂载行的 id**。
+
+### 5.2 设置命名空间 = 挂载行 id，而且 schema 必须有 `.volatile()`
+
+两件事都得对，否则卡片同样静默：
+
+1. **行 id 必须等于卡片问的那个名字**。`SettingsForms.describe()` 公布的是 `entry.options.id`（`cordis.patch.yml`
+   里 `- id:` 那一行，非包名），写入也按它解析。行 id 叫 `jev-tools` 而卡片问 `dsh-jev-tools` → 取不到。
+   本插件的行 id 现在就是包名，`test/bundle-contract.test.ts` 会拦。
+2. **schema 里至少要有一个 `.volatile()`**。`volatileForm(schema)` 对一个 volatile 字段都没有的 schema 返回
+   `undefined`，`describe()` 直接把整条跳过——连命名空间都不会出现；而且**只有标了 volatile 的路径才允许写**。
+   卡片画的字段（总开关、密钥变量名、端点、模型、两个能力开关）都标了。
+   注意 `.volatile()` 会把该字段的解析结果包成标记对象，所以配置要走 `Config['~standard'].validate()`
+   再解包（`src/config.ts` 的 `plainConfig`），否则 `model` 会是 `[object Object]`。
+
 ## 6. 命令速查
 
 ```powershell

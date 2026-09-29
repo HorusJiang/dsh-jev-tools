@@ -5,13 +5,41 @@
  * `docs/s0-trigger-rate.md` for the numbers behind `minTokens`, `perTurnLimit`
  * and `minCatalogSize`.
  *
+ * The settings *namespace* is not declared here: DSH derives it from the mount
+ * row id (`cordis.patch.yml`), which therefore has to equal this package's name —
+ * that is the address the bundle's own card reads and writes.
+ *
  * @module dsh-jev-tools/config
  */
 
 import Schema from '@deepseek-ai/schemastery'
+import { isVolatile } from '@deepseek-ai/cosmokit'
 
-/** Settings namespace this plugin owns. Must be a lowercase-hyphenated identifier. */
-export const JEV_TOOLS_NS = 'dsh-jev-tools'
+/**
+ * Read a resolved config value out of its volatile marker.
+ *
+ * `.volatile()` marks a field as editable from the settings page, and resolving a
+ * marked schema wraps that field's value in a marker object — which is how the
+ * writer knows which keys it may persist to the profile patch. This plugin only
+ * ever wants the *value*, so the marker is unwrapped recursively. It is the same
+ * projection the settings provider performs before drawing a form
+ * (`plainConfig` in `@deepseek-ai/dsh-settings`), and the reason a first-party
+ * plugin can read `config.baseURL` as a string while its schema marks that field
+ * volatile.
+ *
+ * @param value - a resolved config value, possibly marked.
+ * @returns the same value with every marker replaced by what it carries.
+ */
+function plainConfig<T> (value: T): T {
+  if (isVolatile(value)) return plainConfig(value.get() as T)
+  if (Array.isArray(value)) return value.map(item => plainConfig(item)) as unknown as T
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [key, plainConfig(child)])
+    ) as unknown as T
+  }
+  return value
+}
 
 /** Where a user creates a TypeSafe API key. Shown as a link in the settings card. */
 export const TYPESAFE_KEYS_URL = 'https://console.typesafe.ai/keys'
@@ -117,28 +145,42 @@ export interface JevSettings {
 /**
  * Composition-entry schema.
  *
- * Also the declaration a configuration surface dispatches on: a settings card
- * renders from this schema, so every field carries a user-facing description.
+ * Also the declaration a configuration surface dispatches on — and **only fields
+ * marked `.volatile()` reach that surface**. `SettingsForms.describe()` derives
+ * the form through `volatileForm()`, which returns nothing when a schema has no
+ * volatile field, and a write to a non-volatile path is refused. A schema without
+ * a single `.volatile()` therefore publishes **no namespace at all**: the bundle's
+ * card reads nothing, every toggle stays disabled and both endpoint fields stay
+ * blank, with no error printed anywhere.
+ *
+ * So the fields this bundle's own card draws are volatile: the master switch, the
+ * key reference, the endpoint, the model, and the two capability toggles.
+ * `test/bundle-contract.test.ts` keeps that set honest. Everything else stays an
+ * ordinary composition setting, editable by hand in the profile patch.
  */
 export const Config = Schema.object({
   enabled: Schema.boolean()
     .default(true)
+    .volatile()
     .description('总开关。关闭后两项自动能力完全失效——与"未配置 key"行为一致，不发任何网络请求。'),
   apiKeyEnv: Schema.string()
     .default(DEFAULT_API_KEY_ENV)
+    .volatile()
     .description(`读取 API key 的环境变量名。默认 ${DEFAULT_API_KEY_ENV}（与 TypeSafe 官方 SDK 相同，已在使用官方工具链的人无需配置）。密钥本身永远不会出现在任何响应里。`),
   baseUrl: Schema.string()
     .default(DEFAULT_BASE_URL)
+    .volatile()
     .description(`System One 判定端点，填裸主机名（例如 https://jev.example.com）。默认 ${DEFAULT_BASE_URL}；自建的 Jev 兼容服务、或在前面挡了一层网关的部署都要改这里——端点写死会让这些部署的请求发去默认主机，而本插件是 fail-open 的，失败看起来就像什么都没发生。路径 /v1/systemone 由插件追加，不要写进这里。`),
   model: Schema.string()
     .default('jev-latest')
+    .volatile()
     .description('使用的 Jev 模型。别名会随版本移动——每次判定都会记录响应里回报的实际作答版本。'),
   sessionCallLimit: Schema.number()
     .default(200)
     .description('单个会话的最大判定次数（所有能力合计）。超出后原样放行并给出说明，不会静默。'),
 
   prune: Schema.object({
-    enabled: Schema.boolean().default(true)
+    enabled: Schema.boolean().default(true).volatile()
       .description('自动剪掉工具结果中与当前任务无关的部分。'),
     minTokens: Schema.number().default(2000)
       .description('只判定超过这个估算 token 数的工具结果。实测：2000 可省下约 32% 的工具结果 token，同时避开"省得少却照样花 300ms"的边际区间。'),
@@ -163,7 +205,7 @@ export const Config = Schema.object({
   }).description('工具结果语义剪枝'),
 
   suggest: Schema.object({
-    enabled: Schema.boolean().default(true)
+    enabled: Schema.boolean().default(true).volatile()
       .description('当技能目录较大时，每轮至多推荐一个 skill（仅建议，不会替你决定）。'),
     minCatalogSize: Schema.number().default(15)
       .description('技能数量达到此值才启用推荐。实测典型目录有 29 个 skill，此阈值对真实用户必触发、对极简配置保持沉默。'),
@@ -192,11 +234,25 @@ export const Config = Schema.object({
  * Resolve a raw composition entry against the schema.
  *
  * `apply` receives whatever the patch declared, which may be `undefined` when
- * the row carries no `config:`. Calling the schema applies every default.
+ * the row carries no `config:`.
  *
- * @param entry - the raw composition entry config.
+ * The **standard-schema** path is used on purpose: it is the one the Loader
+ * itself takes (`resolveConfig` in cordis is exactly
+ * `Config['~standard'].validate(value)` → `result.value`). Either path hands back
+ * a `.volatile()` field as a marker object rather than the value it denotes, so
+ * {@link plainConfig} unwraps it on the way in **and** on the way out — which
+ * makes this function idempotent, because the Loader hands `apply` the config it
+ * already resolved (markers included).
+ *
+ * @param entry - the composition entry, raw or already resolved by the Loader.
  * @returns the fully resolved settings.
  */
 export function resolveSettings (entry: unknown): JevSettings {
-  return Config(entry ?? {}) as JevSettings
+  const result = Config['~standard'].validate(plainConfig(entry ?? {}))
+  if (result instanceof Promise) throw new TypeError('config validation must be synchronous')
+  if (result.issues !== undefined) {
+    const detail = result.issues.map(issue => issue.message).join('; ')
+    throw new TypeError(`invalid dsh-jev-tools config: ${detail}`)
+  }
+  return plainConfig(result.value) as unknown as JevSettings
 }

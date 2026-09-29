@@ -49,13 +49,12 @@ const LAYERS: Record<string, number> = {
   source: 0,
   tokens: 0,
 
-  // 1 — phrasing, credentials, request building, settings wiring, screening
-  // vocabulary. These depend on foundation modules only.
+  // 1 — phrasing, credentials, request building, screening vocabulary. These
+  // depend on foundation modules only.
   credentials: 1,
   degrade: 1,
   notify: 1,
   request: 1,
-  'settings-ns': 1,
   'features/screen': 1,
 
   // 2 — the vendor binding, and the ledger's neutral surface.

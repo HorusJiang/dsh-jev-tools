@@ -99,11 +99,11 @@ Get a key at <https://console.typesafe.ai/keys>.
 | — | **`jev_ask`'s `state`**, plus the question text you hand it |
 | — | **`jev_gate`'s `request` / `claims` / `evidence` / `artifact`** |
 
-In one line: **once a key is configured, tool output and fetched pages leave the machine.** Where they go is `baseUrl` (default `api.typesafe.ai`) — point it at a self-hosted or third-party System One host and the right-hand column follows. Every capability can be switched off separately in Settings and takes effect immediately; injection screening is **advisory** — it never blocks a call and never rewrites content.
+In one line: **once a key is configured, tool output and fetched pages leave the machine.** Where they go is `baseUrl` (default `api.typesafe.ai`) — point it at a self-hosted or third-party System One host and the right-hand column follows. Pruning and skill suggestion can each be switched off on the settings card, and take effect immediately (the screening switch is not drawn on the card yet — set `screen.enabled` in the composition row); injection screening is **advisory** — it never blocks a call and never rewrites content.
 
 ## Settings
 
-Editable on the settings page, or in the `config:` block of the bundle row. The judgment endpoint and the model are editable in the settings card itself — enter the service root (the plugin appends `/v1/systemone`); OpenRouter, for example, is `https://openrouter.ai/api` with model `jev-latest` and an OpenRouter key.
+Every row can be set in the `config:` block of the bundle row; the settings card edits six of them directly — the master switch, the key reference, the judgment endpoint, the model, and the prune and suggest toggles. The rest (thresholds, allowlists, screening, the ledger, the per-session cap) are composition-only for now. For the endpoint, enter the service root (the plugin appends `/v1/systemone`); OpenRouter, for example, is `https://openrouter.ai/api` with model `jev-latest` and an OpenRouter key.
 
 | Key | Default | Notes |
 |---|---|---|
@@ -178,7 +178,7 @@ The plugin follows your language in both directions with no configuration: the s
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 259 tests (node --test, no test framework)
+npm test                         # builds first, then runs 263 tests (node --test, no test framework)
 node scripts/check-tarball.mjs   # asserts the published tarball carries no local state and nothing is missing
 node scripts/release-notes.ts 0.1.8  # preview a version's GitHub Release body (the workflow calls this on release)
 npm run trigger-rate             # trigger rates from local session logs — no key, no network

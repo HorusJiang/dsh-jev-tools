@@ -99,11 +99,11 @@ key 在 <https://console.typesafe.ai/keys> 申请。
 | — | **`jev_ask` 的 `state`**，以及你交给它的问题文本 |
 | — | **`jev_gate` 的 `request` / `claims` / `evidence` / `artifact`** |
 
-一句话：**启用后，工具输出与抓取到的页面会离开本机。** 目的地由 `baseUrl` 决定（默认 `api.typesafe.ai`）——把它指向自建或第三方 System One 主机，右边一列的目的地就随之改变。每项能力都可在设置页分别关闭，关闭立即生效；注入筛查**只提醒**，绝不拦截调用、绝不改写内容。
+一句话：**启用后，工具输出与抓取到的页面会离开本机。** 目的地由 `baseUrl` 决定（默认 `api.typesafe.ai`）——把它指向自建或第三方 System One 主机，右边一列的目的地就随之改变。精简与技能推荐可在设置卡上分别关闭，关闭立即生效（注入筛查的开关还没画到卡片上，只能在配置行的 `screen.enabled` 里改）；注入筛查**只提醒**，绝不拦截调用、绝不改写内容。
 
 ## 设置项
 
-设置页可改，也可写在 bundle 行的 `config:` 里。判定端点与模型在设置卡片里直接可改——地址填服务的根地址（插件追加 `/v1/systemone`），例如 OpenRouter 是 `https://openrouter.ai/api` + 模型 `jev-latest`，key 用 OpenRouter 的。
+表里的项都可以写在 bundle 行的 `config:` 里；设置卡片直接可改其中六项——总开关、密钥变量名、判定端点、模型，以及精简与技能推荐两个开关。其余（各阈值、白名单、注入筛查、台账、每会话上限）目前只能在配置行里改。判定端点的地址填服务的根地址（插件追加 `/v1/systemone`），例如 OpenRouter 是 `https://openrouter.ai/api` + 模型 `jev-latest`，key 用 OpenRouter 的。
 
 | 项 | 默认 | 说明 |
 |---|---|---|
@@ -178,7 +178,7 @@ npm run measure -- samples.jsonl # 有标注（{p, y}）的数据：准确率、
 
 ```bash
 npm install --cache .npm-cache   # 依赖极少
-npm test                         # 先构建，再跑 259 个测试（node --test，无测试框架依赖）
+npm test                         # 先构建，再跑 263 个测试（node --test，无测试框架依赖）
 node scripts/check-tarball.mjs   # 断言发布包里既没有本机状态、也不缺该有的文件（CI 与发布前都跑）
 node scripts/release-notes.ts 0.1.8  # 预览某个版本的 GitHub Release 正文（发布时由 workflow 调用）
 npm run trigger-rate             # 从本地会话日志统计触发率，无需 key、无网络

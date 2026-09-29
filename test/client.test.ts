@@ -188,8 +188,8 @@ async function factoryOf (): Promise<(require: (name: string) => unknown) => any
 interface CardHarness {
   /** The settled page view. */
   readonly tree: unknown
-  /** Every settings write the card made. */
-  readonly updates: Array<{ ns: string, patch: Record<string, unknown>, revision: unknown }>
+  /** Every settings write the card made, as the shared form received it. */
+  readonly updates: Array<{ ns: string, ops: Array<{ op: string, path: string[], value?: unknown }>, revision: unknown }>
   /** Re-render after a state change, e.g. after typing. */
   rerender: () => Promise<unknown>
 }
@@ -197,15 +197,19 @@ interface CardHarness {
 /**
  * Mount the card against a host holding the given settings.
  *
- * `update` merges and bumps the revision exactly as the seam does, so a
- * re-read after a write shows what the host accepted.
+ * The fake mirrors the real seam's shape: `configForms.get(namespace)` returns a
+ * form whose snapshot carries the resolved values, and whose `mutate` applies the
+ * operations and bumps the revision exactly as the provider does, so a re-read
+ * after a write shows what the host accepted.
  *
- * @param options - the host's settings values and interface language.
+ * @param options - the host's settings values, interface language, and the
+ *   namespace its mirror serves (the mount row id, which DSH keys it by).
  * @returns the rendered card and its write log.
  */
-async function harness (options: { value?: Record<string, unknown>, locale?: string } = {}): Promise<CardHarness> {
+async function harness (options: { value?: Record<string, unknown>, locale?: string, servedNamespace?: string } = {}): Promise<CardHarness> {
   const { React, render } = createReact()
   const updates: CardHarness['updates'] = []
+  const served = options.servedNamespace ?? NS
   const store = {
     value: {
       enabled: true,
@@ -218,22 +222,50 @@ async function harness (options: { value?: Record<string, unknown>, locale?: str
     } as Record<string, unknown>,
     revision: 7,
   }
+  const listeners = new Set<() => void>()
+
+  /** Apply one `set` operation to the fake document. */
+  function applyOp (op: { path: string[], value?: unknown }): void {
+    let node = store.value
+    for (const key of op.path.slice(0, -1)) {
+      const child = node[key]
+      node = (child !== null && typeof child === 'object' ? child : (node[key] = {})) as Record<string, unknown>
+    }
+    node[op.path[op.path.length - 1]!] = op.value
+  }
+
+  /** The one shared form this namespace resolves to. */
+  const form = {
+    // The host serves the namespace under its mount row id; a profile that mounts
+    // it elsewhere leaves the form with no value, which is the state the card has
+    // to name rather than draw as an empty form.
+    getSnapshot: () => served === NS
+      ? { status: 'ready', value: { ...store.value }, revision: store.revision, writable: true }
+      : { status: 'ready', value: undefined, revision: undefined, writable: true },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    set: async (field: string, value: unknown) => form.mutate([{ op: 'set', path: [field], value }]),
+    mutate: async (ops: Array<{ op: string, path: string[], value?: unknown }>, revision?: unknown) => {
+      updates.push({ ns: NS, ops, revision })
+      for (const op of ops) applyOp(op)
+      store.revision += 1
+      for (const listener of listeners) listener()
+      return true
+    },
+  }
 
   let card: any
   const ctx = {
     locale: { getLocale: () => ({ active: options.locale ?? 'zh' }) },
+    configForms: {
+      get: (_ns: string) => form,
+      describe: () => ({
+        getSnapshot: () => ({ status: 'ready', view: { namespaces: [{ ns: served }] } }),
+      }),
+    },
     remote: {
-      settings: {
-        describe: async () => ({
-          ok: true,
-          value: { namespaces: [{ ns: NS, value: { ...store.value }, revision: store.revision }] },
-        }),
-        update: async (ns: string, patch: Record<string, unknown>, revision: unknown) => {
-          updates.push({ ns, patch, revision })
-          Object.assign(store.value, patch)
-          store.revision += 1
-        },
-      },
       credentials: {
         describe: async (refs: string[]) => ({
           ok: true,
@@ -284,13 +316,26 @@ test('an edit reaches the settings seam with the revision the host reported', as
   // Only the changed field: writing the untouched model would turn reading the
   // card into an override that pins the value against future default changes.
   assert.deepEqual(page.updates, [
-    { ns: 'dsh-jev-tools', patch: { baseUrl: 'https://openrouter.ai/api' }, revision: 7 },
+    { ns: 'dsh-jev-tools', ops: [{ op: 'set', path: ['baseUrl'], value: 'https://openrouter.ai/api' }], revision: 7 },
   ])
 
   // The host is re-read after the write, and the card then says where content goes.
   const settled = await page.rerender()
   assert.match(allText(settled), /端点已保存/)
   assert.match(allText(settled), /openrouter\.ai 进行判定/)
+
+  // A capability toggle rides the same seam with an operation path, which is what
+  // lets one write carry `prune.enabled` without restating the rest of `prune` —
+  // and the shared form serializes it with every other editor of this entry.
+  const toggles = nodesOf(settled, node => node.type === 'input' && node.props.type === 'checkbox')
+  assert.equal(toggles.length, 3, 'the card draws exactly the three capability toggles')
+  toggles[1]!.props.onChange({ target: { checked: false } })
+  await flush()
+  assert.deepEqual(page.updates.at(-1), {
+    ns: 'dsh-jev-tools',
+    ops: [{ op: 'set', path: ['prune', 'enabled'], value: false }],
+    revision: 8,
+  })
 })
 
 test('an untouched endpoint is never written', async () => {
@@ -346,4 +391,20 @@ test('the endpoint fields are worded in both languages', async () => {
   assert.match(allText(en.tree), /Judgment endpoint/)
   assert.match(allText(en.tree), /Service address/)
   assert.equal(buttonWith(en.tree, 'Save endpoint').props.disabled, true)
+})
+
+test('a namespace the host does not publish is named, not drawn as an empty form', async () => {
+  // DSH publishes a bundle's settings namespace under its **mount row id**, while
+  // this card addresses the bundle by package name. Mounted as `jev-tools` the
+  // two disagreed for eleven releases, and the card rendered a form that looked
+  // exactly like "nothing is configured": every toggle disabled, both endpoint
+  // fields blank, not one word about why. Naming the missing namespace — and the
+  // ones the host does serve — is what turns that silence into a diagnosis.
+  const page = await harness({ locale: 'en', servedNamespace: 'jev-tools' })
+
+  assert.match(allText(page.tree), /dsh-jev-tools/, 'the card must name the namespace it looked for')
+  assert.match(allText(page.tree), /cordis\.patch\.yml/, 'and the file that decides it')
+  assert.match(allText(page.tree), /host serves: jev-tools/, 'and what the host does serve')
+  assert.equal(buttonWith(page.tree, 'Save endpoint').props.disabled, true)
+  assert.deepEqual(page.updates, [], 'an unreadable namespace must not enable writes')
 })

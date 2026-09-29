@@ -16,6 +16,15 @@
 # self-hosted or gateway deployment) for judging. Every capability can be turned
 # off separately in Settings -> Plugins -> dsh-jev-tools, and disabling takes
 # effect immediately.
+#
+# The row id is the package name on purpose. DSH addresses a bundle's settings
+# namespace by its **mount row id** — `SettingsForms.describe()` publishes
+# `entry.options.id`, and a write resolves the same way — while this bundle's own
+# card (the occupant of `plugins.bundle.config`) and the plugin page's config seat
+# are keyed by the **package name**. Mounted as `jev-tools` the two disagree, and
+# the card reads no namespace at all: every toggle stays disabled and the endpoint
+# fields stay blank, with no error printed anywhere. Keep the row id and the
+# package name equal — `test/bundle-contract.test.ts` enforces it.
 - insert:
-    - id: jev-tools
+    - id: dsh-jev-tools
       name: dsh-jev-tools

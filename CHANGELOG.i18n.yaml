@@ -9,5 +9,5 @@
 #
 # That test recomputes these hashes with `node:crypto` and also checks that the two
 # sides keep the same structure.
-CHANGELOG.md: 0700d88edee0899d3ce34a17bedd6c66e6096c13
-CHANGELOG.en.md: 63681980ed20d867e53be7b51b6c1e7c906ec1ca
+CHANGELOG.md: 9223690e115e32615672ba8ff0b03d75cbbd3ad7
+CHANGELOG.en.md: beaa16111386d93e59d0a97f739b06e51aa4534e

@@ -16,14 +16,8 @@ import {
   DEFAULT_API_KEY_ENV,
   DEFAULT_BASE_URL,
   DEFAULT_TOOL_ALLOWLIST,
-  JEV_TOOLS_NS,
   resolveSettings,
 } from '../lib/config.js'
-
-test('namespace is a lowercase-hyphenated identifier', () => {
-  // The settings seam rejects anything else with a TypeError.
-  assert.match(JEV_TOOLS_NS, /^[a-z][a-z0-9-]*$/)
-})
 
 test('defaults match the S0 measurements', () => {
   const s = resolveSettings(undefined)
@@ -72,11 +66,20 @@ test('a composition entry overrides defaults without dropping the others', () =>
 })
 
 test('the schema is usable as a configuration-surface declaration', () => {
-  // A settings card renders from this schema, so it must be callable and
-  // resolve an empty entry to a complete value.
+  // A settings card renders from this schema, so it must be callable, and the
+  // entry point the plugin itself uses must resolve an empty entry to a complete
+  // value — with every `.volatile()` marker already unwrapped.
   assert.equal(typeof Config, 'function')
-  const resolved = Config({}) as { prune: { enabled: boolean } }
+  const resolved = resolveSettings({})
   assert.equal(resolved.prune.enabled, true)
+
+  // ...and it must accept the shape `apply` actually receives: the Loader resolves
+  // the config before handing it over, markers included. Validating that shape
+  // without unwrapping it first threw `expected boolean but got [object Object]`
+  // at mount, and a throw there fails the whole fiber — the plugin then serves no
+  // settings at all, which reads in the UI as "the card cannot read its namespace".
+  const loaderResolved = Config['~standard'].validate({}).value
+  assert.deepEqual(resolveSettings(loaderResolved), resolved)
 })
 
 test('a key scoped to another System One host can point the plugin at it', () => {
