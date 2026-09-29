@@ -11,7 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
-| `0.1.11` | 2026-09-30 | **pending** | The judgment endpoint and model are finally editable in the configuration card: both settings have existed since 0.1.6, and the card had never drawn them. |
+| `0.1.11` | 2026-09-30 | **published** | The judgment endpoint and model are finally editable in the configuration card: both settings have existed since 0.1.6, and the card had never drawn them. |
 | `0.1.10` | 2026-09-25 | **published** | The ledger records baseline coverage; a net gain is no longer reported without a measured baseline. |
 | `0.1.9` | 2026-09-25 | **published** | An injected notice used to fail the whole turn; the source kind now names its producer, as format v4 requires. |
 | `0.1.8` | 2026-09-22 | **published** | Skill suggestion had **never fired**, now fixed; the two tools' quota and refusal reasons are no longer dead or silent. |
