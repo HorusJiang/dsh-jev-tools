@@ -103,7 +103,7 @@ In one line: **once a key is configured, tool output and fetched pages leave the
 
 ## Settings
 
-Editable on the settings page, or in the `config:` block of the bundle row.
+Editable on the settings page, or in the `config:` block of the bundle row. The judgment endpoint and the model are editable in the settings card itself — enter the service root (the plugin appends `/v1/systemone`); OpenRouter, for example, is `https://openrouter.ai/api` with model `jev-latest` and an OpenRouter key.
 
 | Key | Default | Notes |
 |---|---|---|
@@ -178,7 +178,7 @@ The plugin follows your language in both directions with no configuration: the s
 
 ```bash
 npm install --cache .npm-cache   # very few dependencies
-npm test                         # builds first, then runs 253 tests (node --test, no test framework)
+npm test                         # builds first, then runs 259 tests (node --test, no test framework)
 node scripts/check-tarball.mjs   # asserts the published tarball carries no local state and nothing is missing
 node scripts/release-notes.ts 0.1.8  # preview a version's GitHub Release body (the workflow calls this on release)
 npm run trigger-rate             # trigger rates from local session logs — no key, no network

@@ -19,7 +19,15 @@
  *     source, and whether it is writable. The secret literal never rides a
  *     response; the input starts blank on every load.
  *   - `remote.settings` reads and writes this plugin's own namespace, so the
- *     capability toggles are the same values the host resolves.
+ *     capability toggles, the judgment endpoint and the model are the same
+ *     values the host resolves.
+ *
+ * Endpoint and model are hand-written fields rather than a form generated from
+ * the schema: this card occupies `plugins.bundle.config` under this bundle's
+ * package name, and that seat is single-occupant, so whatever it draws *is* the
+ * bundle's configuration page. A settings field the card omits is a field a GUI
+ * user cannot reach at all — which is exactly how `baseUrl` shipped unused
+ * between 0.1.6 and 0.1.10 (issue #3).
  *
  * @module dsh-jev-tools/client
  */
@@ -31,8 +39,48 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-jev-tools'
     /** Where a user creates a TypeSafe API key. */
     const KEYS_URL = 'https://console.typesafe.ai/keys'
+    /** Where a user creates an OpenRouter key, when the endpoint is OpenRouter's. */
+    const OPENROUTER_KEYS_URL = 'https://openrouter.ai/settings/keys'
+    /** The vendor's own System One root: what the host falls back to, and what the card shows before it has read a value. */
+    const DEFAULT_BASE_URL = 'https://api.typesafe.ai'
     /** Credential reference used when the settings name none. */
     const DEFAULT_REF = 'TYPESAFE_API_KEY'
+    /**
+     * The only address shape the backend can POST to: an absolute http(s) root
+     * with no whitespace. Checked here because a save that stores `openrouter.ai`
+     * would send the next judgment to a relative URL, and every capability in
+     * this plugin is fail-open — that failure looks exactly like doing nothing.
+     */
+    const BASE_URL_RE = /^https?:\/\/\S+$/i
+
+    /**
+     * Whether an endpoint is OpenRouter's, which issues its own keys.
+     *
+     * @param {string} baseUrl - the endpoint as configured.
+     * @returns {boolean} true when the card should link to OpenRouter's console.
+     */
+    function isOpenRouter (baseUrl) {
+      try {
+        const host = new URL(baseUrl).hostname
+        return host === 'openrouter.ai' || host.endsWith('.openrouter.ai')
+      } catch {
+        return false
+      }
+    }
+
+    /**
+     * The endpoint's host, for copy that has to name where content is sent.
+     *
+     * @param {string} baseUrl - the endpoint as configured.
+     * @returns {string} the host, or the raw value when it will not parse.
+     */
+    function hostOf (baseUrl) {
+      try {
+        return new URL(baseUrl).host
+      } catch {
+        return baseUrl
+      }
+    }
 
     /** Every user-facing string, in both languages. */
     const S = {
@@ -42,8 +90,9 @@ window.__ModuleLoader__.load({
         reading: '读取中…',
         configured: (source) => `已配置（来源：${source}）`,
         unconfigured: '未配置',
-        intro: '还没有 API key。到 TypeSafe 控制台 创建一个，然后粘贴到下面。',
-        getKey: '获取 API key →',
+        intro: '还没有 API key。按下面的链接申请一个，然后粘贴到下面。',
+        getKeyTypeSafe: '到 TypeSafe 控制台申请 key →',
+        getKeyOpenRouter: '到 OpenRouter 申请 key →',
         keyPlaceholder: (ref) => `粘贴 ${ref}`,
         keyPlaceholderSet: '已配置，粘贴新值可覆盖',
         save: '保存',
@@ -53,10 +102,19 @@ window.__ModuleLoader__.load({
         noCredentialService: '凭据服务不可用，无法保存。可改用环境变量方式配置。',
         noSettingsService: '设置服务不可用。',
         readonlyRef: (ref) => `环境变量 ${ref} 由只读来源提供，无法在界面上覆盖。要修改请改动它的来源。`,
+        endpointHeading: '判定端点',
+        endpointBase: '服务地址',
+        endpointModel: '模型',
+        endpointSave: '保存端点',
+        endpointSaved: '端点已保存；下一次判定就用新地址。',
+        endpointBadUrl: '服务地址要以 http:// 或 https:// 开头，且不能含空格。',
+        endpointBadModel: '模型不能为空。',
+        endpointHint: '插件会在这个地址后追加 /v1/systemone，所以这里填服务的根地址。接第三方 System One 主机：'
+          + 'OpenRouter 填 https://openrouter.ai/api，模型填 jev-latest（或 typesafe/jev-1.13），key 用 OpenRouter 的。',
         toggleMaster: '启用插件',
         togglePrune: '精简超长的工具输出',
         toggleSuggest: '推荐该用的技能',
-        privacy: '隐私：启用后，被精简掉的工具输出内容会发送到 api.typesafe.ai 进行判定；'
+        privacy: (host) => `隐私：启用后，被精简掉的工具输出内容会发送到 ${host} 进行判定；`
           + '推荐技能时只发送当前请求与技能名称、描述。密钥保存在本机凭据存储中，不会回显。'
           + '没配 key 时两项能力完全不生效、不发任何网络请求。',
         ledger: '判定台账只记元数据（token 数、段数、作答版本、跳过原因），不含任何提示词或工具输出正文，'
@@ -70,8 +128,9 @@ window.__ModuleLoader__.load({
         reading: 'reading…',
         configured: (source) => `configured (source: ${source})`,
         unconfigured: 'not configured',
-        intro: 'No API key yet. Create one in the TypeSafe console, then paste it below.',
-        getKey: 'Get an API key →',
+        intro: 'No API key yet. Get one from the link below, then paste it here.',
+        getKeyTypeSafe: 'Get a key from the TypeSafe console →',
+        getKeyOpenRouter: 'Get a key from OpenRouter →',
         keyPlaceholder: (ref) => `paste ${ref}`,
         keyPlaceholderSet: 'configured — paste a new value to replace it',
         save: 'Save',
@@ -81,10 +140,20 @@ window.__ModuleLoader__.load({
         noCredentialService: 'The credentials service is unavailable, so the key cannot be stored here. Use an environment variable instead.',
         noSettingsService: 'The settings service is unavailable.',
         readonlyRef: (ref) => `${ref} comes from a read-only source and cannot be overridden here; change that source instead.`,
+        endpointHeading: 'Judgment endpoint',
+        endpointBase: 'Service address',
+        endpointModel: 'Model',
+        endpointSave: 'Save endpoint',
+        endpointSaved: 'Endpoint saved; the next judgment uses it.',
+        endpointBadUrl: 'The service address must start with http:// or https:// and contain no spaces.',
+        endpointBadModel: 'The model cannot be empty.',
+        endpointHint: 'The plugin appends /v1/systemone to this address, so enter the service root. '
+          + 'For a third-party System One host: OpenRouter is https://openrouter.ai/api with model '
+          + 'jev-latest (or typesafe/jev-1.13), using an OpenRouter key.',
         toggleMaster: 'Enable the plugin',
         togglePrune: 'Prune oversized tool output',
         toggleSuggest: 'Suggest which skill to use',
-        privacy: 'Privacy: once enabled, the tool output that gets pruned is sent to api.typesafe.ai for judging; '
+        privacy: (host) => `Privacy: once enabled, the tool output that gets pruned is sent to ${host} for judging; `
           + 'skill suggestions send only the current request plus skill names and descriptions. '
           + 'The key is stored in this machine\u2019s credential store and is never echoed back. '
           + 'With no key configured both capabilities are completely inert and make no network request.',
@@ -180,6 +249,28 @@ window.__ModuleLoader__.load({
         h('span', { style: { color: TEXT } }, label))
       }
 
+      /**
+       * One staged text field.
+       *
+       * @param {string} label - the field's name.
+       * @param {string} value - the staged value.
+       * @param {(next: string) => void} onChange - receives the whole next value.
+       * @param {string} placeholder - shown while the field is empty.
+       * @param {boolean} disabled - true while the host has not answered yet.
+       * @returns {object} the field element.
+       */
+      function field (label, value, onChange, placeholder, disabled) {
+        return h('label', {
+          style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' },
+        },
+        h('span', { style: { color: MUTED, minWidth: '76px' } }, label),
+        h('input', {
+          value, placeholder, autoComplete: 'off', disabled: disabled === true,
+          onChange: (event) => { onChange(event.target.value) },
+          style: { flex: 1, minWidth: 0, fontSize: '12px', padding: '6px 8px', borderRadius: '6px', border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT },
+        }))
+      }
+
       const link = (href, text) => h('a', {
         href, target: '_blank', rel: 'noreferrer',
         style: { color: ACCENT, fontSize: '12px', textDecoration: 'none' },
@@ -200,7 +291,26 @@ window.__ModuleLoader__.load({
         const [draft, setDraft] = React.useState('')
         const [note, setNote] = React.useState('')
         const [busy, setBusy] = React.useState(false)
+        // The endpoint travels with the key: a key issued by OpenRouter or a
+        // self-hosted System One host earns a 401 against the default host, and
+        // because every capability here is fail-open that 401 looks like the
+        // plugin doing nothing. Both fields are staged, and written only on the
+        // explicit save below — a settings write is durable, so it must not
+        // happen per keystroke.
+        const [baseUrlDraft, setBaseUrlDraft] = React.useState('')
+        const [modelDraft, setModelDraft] = React.useState('')
+        const seeded = React.useRef(false)
         const t = S[lang]
+
+        // Seed the endpoint drafts once, when the host's values first arrive.
+        // Re-seeding on every load would discard whatever is being typed the
+        // moment a toggle writes and reloads.
+        React.useEffect(() => {
+          if (settings === null || seeded.current) return
+          seeded.current = true
+          setBaseUrlDraft(typeof settings.baseUrl === 'string' ? settings.baseUrl : '')
+          setModelDraft(typeof settings.model === 'string' ? settings.model : '')
+        }, [settings])
 
         // Follow the DSH language: re-render whenever the locale changes.
         React.useEffect(() => {
@@ -212,6 +322,13 @@ window.__ModuleLoader__.load({
         const ref = settings !== null && typeof settings.apiKeyEnv === 'string' && settings.apiKeyEnv !== ''
           ? settings.apiKeyEnv
           : DEFAULT_REF
+
+        /** The endpoint the host reports, before this card has read a value. */
+        const settingsBaseUrl = settings !== null && typeof settings.baseUrl === 'string' ? settings.baseUrl : ''
+        const settingsModel = settings !== null && typeof settings.model === 'string' ? settings.model : ''
+        /** The endpoint the copy names: the configured one, or the vendor's own until the host answers. */
+        const effectiveBaseUrl = settingsBaseUrl === '' ? DEFAULT_BASE_URL : settingsBaseUrl
+        const openRouter = isOpenRouter(effectiveBaseUrl)
 
         /** Re-read both seams. Never throws: a failure becomes a visible note. */
         const load = React.useCallback(async () => {
@@ -265,7 +382,12 @@ window.__ModuleLoader__.load({
           }
         }, [draft, ref, load])
 
-        /** Patch one top-level settings field. */
+        /**
+         * Patch top-level settings fields, then re-read the host.
+         *
+         * @param {object} change - the fields to merge.
+         * @returns {Promise<boolean>} whether the host accepted the write.
+         */
         const patch = React.useCallback(async (change) => {
           setBusy(true)
           setNote('')
@@ -273,16 +395,36 @@ window.__ModuleLoader__.load({
             const settingsApi = remote('remote.settings')
             if (settingsApi === undefined) {
               setNote(S[langOf(ctx)].noSettingsService)
-              return
+              return false
             }
             await settingsApi.update(NS, change, revision)
             await load()
+            return true
           } catch (error) {
             setNote(S[langOf(ctx)].saveFailed(String(error)))
+            return false
           } finally {
             setBusy(false)
           }
         }, [revision, load])
+
+        /**
+         * Save the endpoint fields, and only the ones that changed.
+         *
+         * Writing an unchanged field would turn "I looked at it" into an
+         * override, which pins the value against future default changes; a
+         * strict-equal draft therefore produces no write at all.
+         */
+        const saveEndpoint = React.useCallback(async () => {
+          const change = {}
+          const baseUrl = baseUrlDraft.trim()
+          const model = modelDraft.trim()
+          if (settings === null) return
+          if (baseUrl !== settingsBaseUrl) change.baseUrl = baseUrl
+          if (model !== settingsModel) change.model = model
+          if (Object.keys(change).length === 0) return
+          if (await patch(change)) setNote(S[langOf(ctx)].endpointSaved)
+        }, [baseUrlDraft, modelDraft, settings, patch])
 
         const configured = credential !== null && credential.configured === true
         const status = credential === null
@@ -300,12 +442,27 @@ window.__ModuleLoader__.load({
         const masterOn = settings !== null && settings.enabled === true
         const writable = credential === null || credential.writable !== false
 
+        // What the endpoint section can do right now. An invalid draft blocks
+        // the save and says why, rather than being stored and failing later as
+        // silence: every capability in this plugin is fail-open.
+        const baseUrlValue = baseUrlDraft.trim()
+        const modelValue = modelDraft.trim()
+        const endpointReadOnly = settings === null || busy
+        // An empty address is invalid too: storing one would POST to a relative
+        // URL, and that failure is invisible everywhere else.
+        const baseUrlInvalid = !BASE_URL_RE.test(baseUrlValue)
+        const modelInvalid = modelValue === ''
+        const endpointDirty = settings !== null
+          && (baseUrlValue !== settingsBaseUrl || modelValue !== settingsModel)
+        const endpointSaveDisabled = endpointReadOnly || !endpointDirty || baseUrlInvalid || modelInvalid
+
         return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 0' } },
           h('div', { style: { fontSize: '13px', fontWeight: 600, color: TEXT } }, t.heading),
 
           row(t.status, status),
           configured ? null : h('div', { style: { fontSize: '12px', color: MUTED } }, t.intro),
-          h('div', { style: { fontSize: '12px' } }, link(KEYS_URL, t.getKey)),
+          h('div', { style: { fontSize: '12px' } },
+            link(openRouter ? OPENROUTER_KEYS_URL : KEYS_URL, openRouter ? t.getKeyOpenRouter : t.getKeyTypeSafe)),
 
           h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
             h('input', Object.assign({
@@ -324,11 +481,26 @@ window.__ModuleLoader__.load({
           writable ? null : h('div', { style: { fontSize: '11px', color: MUTED } }, t.readonlyRef(ref)),
 
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px', borderTop: `1px solid ${BORDER}` } },
+            h('div', { style: { fontSize: '12px', fontWeight: 600, color: TEXT } }, t.endpointHeading),
+            field(t.endpointBase, baseUrlDraft, (next) => { setBaseUrlDraft(next) }, DEFAULT_BASE_URL, endpointReadOnly),
+            field(t.endpointModel, modelDraft, (next) => { setModelDraft(next) }, 'jev-latest', endpointReadOnly),
+            baseUrlInvalid ? h('div', { style: { fontSize: '11px', color: MUTED } }, t.endpointBadUrl) : null,
+            modelInvalid ? h('div', { style: { fontSize: '11px', color: MUTED } }, t.endpointBadModel) : null,
+            h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+              h('button', {
+                type: 'button',
+                disabled: endpointSaveDisabled,
+                onClick: () => { void saveEndpoint() },
+                style: { fontSize: '12px', padding: '6px 12px', borderRadius: '6px', border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT, cursor: endpointSaveDisabled ? 'default' : 'pointer' },
+              }, t.endpointSave)),
+            h('div', { style: { fontSize: '11px', color: MUTED, lineHeight: '16px' } }, t.endpointHint)),
+
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px', borderTop: `1px solid ${BORDER}` } },
             toggle(t.toggleMaster, masterOn, busy || settings === null, (next) => { void patch({ enabled: next }) }),
             toggle(t.togglePrune, pruneOn, busy || settings === null, (next) => { void patch({ prune: { enabled: next } }) }),
             toggle(t.toggleSuggest, suggestOn, busy || settings === null, (next) => { void patch({ suggest: { enabled: next } }) })),
 
-          h('div', { style: { fontSize: '11px', color: MUTED, lineHeight: '16px' } }, t.privacy),
+          h('div', { style: { fontSize: '11px', color: MUTED, lineHeight: '16px' } }, t.privacy(hostOf(effectiveBaseUrl))),
 
           h('div', { style: { fontSize: '11px', color: MUTED, lineHeight: '16px' } }, t.ledger),
 

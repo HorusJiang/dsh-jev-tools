@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.11` | 2026-09-30 | **pending** | The judgment endpoint and model are finally editable in the configuration card: both settings have existed since 0.1.6, and the card had never drawn them. |
 | `0.1.10` | 2026-09-25 | **published** | The ledger records baseline coverage; a net gain is no longer reported without a measured baseline. |
 | `0.1.9` | 2026-09-25 | **published** | An injected notice used to fail the whole turn; the source kind now names its producer, as format v4 requires. |
 | `0.1.8` | 2026-09-22 | **published** | Skill suggestion had **never fired**, now fixed; the two tools' quota and refusal reasons are no longer dead or silent. |
@@ -24,6 +25,27 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 | `0.1.0` | 2026-09-20 | **published** | The first release, containing everything described below. |
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
+
+## [0.1.11] — 2026-09-30
+
+### Fixed
+
+- **The judgment endpoint is finally editable in the UI.** `baseUrl` and `model` have been host-side
+  settings since 0.1.6, and the backend reads their live values on every judgment, but the
+  configuration card drew only the key input and three toggles — and the `plugins.bundle.config` seat
+  that card occupies is **single-occupant per package name**, so a field the card does not draw is a
+  field the page cannot reach. Both settings were therefore declared, wired and documented as
+  "editable on the settings page" while in fact being editable only by hand-editing the composition
+  row and restarting the host. Evidence: the reporter of issue #3 described exactly that — wanting to
+  point Jev at OpenRouter and finding it could only be set at startup. The card now carries a
+  "Judgment endpoint" section with the service address and the model, staged and written on an
+  explicit save; the address must start with `http(s)://` and be non-empty or the save is blocked
+  with a reason; and only genuinely changed fields are written, so looking at the card is not an
+  override.
+- **Two lines of copy stopped lying about the destination.** The privacy note hardcoded
+  `api.typesafe.ai`, which became wrong the moment the endpoint was made configurable; it now names
+  the host actually in force. The key link follows the same value: an OpenRouter endpoint gets
+  `openrouter.ai/settings/keys`, everything else keeps the TypeSafe console.
 
 ## [0.1.10] — 2026-09-25
 
