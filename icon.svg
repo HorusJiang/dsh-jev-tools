@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36" role="img" aria-label="dsh-jev-tools">
+  <defs>
+    <linearGradient id="jevPath" x1="19" y1="8" x2="33" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22C9E6" />
+      <stop offset="1" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  <!-- The checklist: every call is judged, and the judgement is a yes or a no. -->
+  <path d="M4.2 11H11.6" stroke="#6B7A90" stroke-opacity="0.55" stroke-width="2" stroke-linecap="round" />
+  <path d="M13.8 8.9l4.2 4.2M18 8.9l-4.2 4.2" fill="none" stroke="#F87171" stroke-width="2" stroke-linecap="round" />
+  <!-- The no is dropped here; the yes becomes the decision path. -->
+  <path d="M4.2 25H11.6" stroke="#7E8CA3" stroke-width="2" stroke-linecap="round" />
+  <path d="M13.6 25l2.1 2.2 3.8-4.3" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M19.8 25H32.2" fill="none" stroke="url(#jevPath)" stroke-width="2.7" stroke-linecap="round" />
+  <path d="M29.3 22.3 32.2 25l-2.9 2.7" fill="none" stroke="url(#jevPath)" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

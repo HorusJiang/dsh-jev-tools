@@ -26,6 +26,18 @@
 
 已发布到 npm：`npm i dsh-jev-tools`。也可以直接从仓库检出目录安装。
 
+## [0.1.13] — 2026-09-30
+
+### Added
+
+- **插件图标：清单判定 → 决策路径。** `package.json` 增加 `icon: "icon.svg"`——一行红叉、一行绿勾，
+  绿勾之后直接延伸成青→紫的箭头：被否掉的停在原地，通过的那条成为路径。DSH 插件页的包卡片、
+  详情页与插件行会显示它：Host 的 `readPluginMeta()`（`@deepseek-ai/dsh-app-boot`）读
+  `package.json.icon`，按扩展名映射 MIME 后编码成 `image/svg+xml;base64` 的 data URL 交给
+  `<img src>`，只有未声明或解码失败时才回落到默认风车插画。`files` 里同时加上 `icon.svg`：
+  `files` 是 allowlist，不带上就是"字段在、文件不在"，装了插件照样没有图标。颜色是固定值，
+  因为 `<img>` 里拿不到 `currentColor`，一份文件同时服务浅色与深色两套主题。
+
 ## [0.1.12] — 2026-09-30
 
 ### Fixed

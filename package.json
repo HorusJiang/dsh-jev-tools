@@ -1,7 +1,8 @@
 {
   "name": "dsh-jev-tools",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Gives DeepSeek Harness three automatic Jev judgments — prune oversized tool output, screen fetched pages for injected instructions, suggest which skill to use — plus the jev_ask and jev_gate tools, a persistent judgment ledger, and a /jev-status diagnosis command. Requires a TypeSafe API key; with none configured it is completely inert and makes no network request.",
+  "icon": "icon.svg",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -18,6 +19,7 @@
     "lib",
     "client",
     "docs",
+    "icon.svg",
     "cordis.patch.yml",
     "LICENSE",
     "README.md",

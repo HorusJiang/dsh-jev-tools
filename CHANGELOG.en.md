@@ -27,6 +27,21 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 Published on npm: `npm i dsh-jev-tools`. It can also be installed from the repository checkout.
 
+## [0.1.13] — 2026-09-30
+
+### Added
+
+- **The plugin icon: a checklist that becomes a decision path.** `package.json` gains
+  `icon: "icon.svg"` — one crossed-out row, one checked row, and the checked row running on as a
+  cyan→violet arrow: the rejected one stops where it is, the accepted one becomes the path. The
+  Plugins page shows it on package cards, detail pages and plugin rows: the Host's
+  `readPluginMeta()` (`@deepseek-ai/dsh-app-boot`) reads `package.json.icon`, maps the extension to
+  a MIME type and hands the page an `image/svg+xml;base64` data URL as `<img src>`, falling back to
+  the default pinwheel only when the field is absent or the image will not decode. `icon.svg` is
+  listed in `files` as well: `files` is an allowlist, so omitting it ships the field without the
+  file and the installed plugin shows no icon. The colours are fixed values, because an `<img>`
+  gets no `currentColor`, so one file serves both the light and the dark theme.
+
 ## [0.1.12] — 2026-09-30
 
 ### Fixed
