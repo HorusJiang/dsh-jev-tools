@@ -11,6 +11,7 @@ This project is pre-1.0: a minor version may contain a breaking change, and the
 
 | Version | Date | State | Summary |
 |---|---|---|---|
+| `0.1.13` | 2026-09-30 | **published** | The plugin icon: a checklist that becomes a decision path. |
 | `0.1.12` | 2026-09-30 | **published** | The settings card finally reads and writes its own settings: mount row id, `.volatile()` markers, the `configForms` seam, and idempotent resolution, fixed together. |
 | `0.1.11` | 2026-09-30 | **published** | The judgment endpoint and model are finally editable in the configuration card: both settings have existed since 0.1.6, and the card had never drawn them. |
 | `0.1.10` | 2026-09-25 | **published** | The ledger records baseline coverage; a net gain is no longer reported without a measured baseline. |
