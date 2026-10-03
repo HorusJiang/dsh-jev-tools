@@ -59,7 +59,7 @@
     "measure": "node scripts/measure.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {
