@@ -198,6 +198,12 @@ npm run measure -- --ledger      # 读本机持久化台账，报告相对 DSH �
 
 完整流程、失败处理与恢复步骤见 **[RELEASING.md](https://github.com/HorusJiang/dsh-jev-tools/blob/main/RELEASING.md)**。
 
+## 安全
+
+启用后**工具输出与抓取到的页面会离开本机**（目的地由 `baseUrl` 决定）；未配置 key 时插件完全惰性、不发任何请求。key 走 DSH 凭据服务或环境变量，**没有文件形式的存储**，也从不回显。指向下面这份文档是因为它写清了「什么发到哪里」，以及哪些失败路径是刻意 fail-open / fail-closed 的——报告漏洞请走私密通道，不要开公开 issue。
+
+漏洞报告流程、数据边界表与 in/out of scope：[SECURITY.md](https://github.com/HorusJiang/dsh-jev-tools/blob/main/SECURITY.md)
+
 ## License
 
 MIT.

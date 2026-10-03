@@ -198,6 +198,12 @@ Pushing to `main` **does not work directly**: `main` is protected (a PR plus the
 
 The full process, failure handling and recovery steps are in **[RELEASING.md](https://github.com/HorusJiang/dsh-jev-tools/blob/main/RELEASING.md)**.
 
+## Security
+
+With the plugin enabled, **tool output and fetched pages leave the machine** (the destination is whatever `baseUrl` resolves to); with no key configured it is completely inert and makes no request. The key comes from the DSH credentials service or an environment variable, has **no file-based store**, and is never echoed. This points at the document that spells out what goes where, and which failure paths are deliberately fail-open or fail-closed — report a vulnerability through the private channel, not a public issue.
+
+Reporting, the data-boundary table, and in/out of scope: [SECURITY.md](https://github.com/HorusJiang/dsh-jev-tools/blob/main/SECURITY.md)
+
 ## License
 
 MIT.
