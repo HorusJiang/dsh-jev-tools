@@ -63,8 +63,8 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@deepseek-ai/cosmokit": "^1.8.5",
-    "@deepseek-ai/schemastery": "^3.18.4"
+    "@deepseek-ai/cosmokit": "^1.8.6",
+    "@deepseek-ai/schemastery": "^3.18.5"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
